@@ -1153,36 +1153,38 @@ export default function App() {
                 )}
               </View>
               
-              {/* Input bar */}
+              {/* Input bar - floating style */}
               {messages.length > 0 && (
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    ref={inputRef}
-                    style={styles.input}
-                    value={inputText}
-                    onChangeText={setInputText}
-                    placeholder="Message Bubl"
-                    onSubmitEditing={sendMessage}
-                    autoCapitalize="sentences"
-                    returnKeyType="send"
-                    enablesReturnKeyAutomatically={true}
-                    multiline={false}
-                    accessibilityLabel="Message input field"
-                    accessibilityHint="Type your message here and press send"
-                  />
-                  <TouchableOpacity 
-                    style={styles.sendButton} 
-                    onPress={inputText.trim() ? sendMessage : openVoiceChat}
-                    activeOpacity={0.7}
-                    accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
-                    accessibilityRole="button"
-                  >
-                    {inputText.trim() ? (
-                      <Image source={require('./assets/send_icon.png')} style={styles.icon} />
-                    ) : (
-                      <Image source={require('./assets/call_icon.png')} style={styles.icon} />
-                    )}
-                  </TouchableOpacity>
+                <View style={styles.inputContainerWrapper}>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      ref={inputRef}
+                      style={styles.input}
+                      value={inputText}
+                      onChangeText={setInputText}
+                      placeholder="Message Bubl"
+                      onSubmitEditing={sendMessage}
+                      autoCapitalize="sentences"
+                      returnKeyType="send"
+                      enablesReturnKeyAutomatically={true}
+                      multiline={false}
+                      accessibilityLabel="Message input field"
+                      accessibilityHint="Type your message here and press send"
+                    />
+                    <TouchableOpacity 
+                      style={styles.sendButton} 
+                      onPress={inputText.trim() ? sendMessage : openVoiceChat}
+                      activeOpacity={0.7}
+                      accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
+                      accessibilityRole="button"
+                    >
+                      {inputText.trim() ? (
+                        <Image source={require('./assets/send_icon.png')} style={styles.icon} />
+                      ) : (
+                        <Image source={require('./assets/call_icon.png')} style={styles.icon} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
               
@@ -1470,37 +1472,39 @@ export default function App() {
               )}
         </View>
         
-            {/* Only show the bottom input bar when there are messages */}
+            {/* Input bar - floating style */}
             {messages.length > 0 && (
-        <View style={styles.inputContainer}>
-          <TextInput
-            ref={inputRef}
-            style={styles.input}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Message Bubl"
-            onSubmitEditing={sendMessage}
-            autoCapitalize="sentences"
-            returnKeyType="send"
-            enablesReturnKeyAutomatically={true}
-            multiline={false}
-            accessibilityLabel="Message input field"
-            accessibilityHint="Type your message here and press send"
-          />
-          <TouchableOpacity 
-            style={styles.sendButton} 
-            onPress={inputText.trim() ? sendMessage : openVoiceChat}
-            activeOpacity={0.7}
-            accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
-            accessibilityRole="button"
-          >
-            {inputText.trim() ? (
-              <Image source={require('./assets/send_icon.png')} style={styles.icon} />
-            ) : (
-              <Image source={require('./assets/call_icon.png')} style={styles.icon} />
-            )}
-          </TouchableOpacity>
-        </View>
+              <View style={styles.inputContainerWrapper}>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    ref={inputRef}
+                    style={styles.input}
+                    value={inputText}
+                    onChangeText={setInputText}
+                    placeholder="Message Bubl"
+                    onSubmitEditing={sendMessage}
+                    autoCapitalize="sentences"
+                    returnKeyType="send"
+                    enablesReturnKeyAutomatically={true}
+                    multiline={false}
+                    accessibilityLabel="Message input field"
+                    accessibilityHint="Type your message here and press send"
+                  />
+                  <TouchableOpacity 
+                    style={styles.sendButton} 
+                    onPress={inputText.trim() ? sendMessage : openVoiceChat}
+                    activeOpacity={0.7}
+                    accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
+                    accessibilityRole="button"
+                  >
+                    {inputText.trim() ? (
+                      <Image source={require('./assets/send_icon.png')} style={styles.icon} />
+                    ) : (
+                      <Image source={require('./assets/call_icon.png')} style={styles.icon} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
         
         {/* Voice Chat Modal */}
@@ -1703,7 +1707,7 @@ const styles = StyleSheet.create({
     backgroundColor: BUBL_COLORS.white,
   },
   chatContent: {
-    paddingBottom: 20,
+    paddingBottom: 100,
     paddingHorizontal: 16,
     width: '100%',
     maxWidth: 800,
@@ -1743,29 +1747,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
+  inputContainerWrapper: {
+    width: '100%',
+    position: 'relative',
+    paddingHorizontal: 16,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+    marginBottom: 0,
+    backgroundColor: 'transparent',
+  },
   inputContainer: {
     flexDirection: 'row',
     width: '100%',
     maxWidth: 800,
     alignSelf: 'center',
-    padding: 10,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 10,
-    borderTopWidth: 1,
-    borderTopColor: BUBL_COLORS.border,
-    backgroundColor: BUBL_COLORS.white,
-    paddingHorizontal: 16,
+    padding: 16,
+    paddingVertical: 16,
+    backgroundColor: '#f9f9fa',
+    borderRadius: 30,
+    // Add elevation/shadow to make it float
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 5,
+    ...(Platform.OS === 'web' ? {
+      boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.08)',
+    } : {}),
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: BUBL_COLORS.border,
-    padding: 12,
-    paddingVertical: 12,
+    borderWidth: 0, // Remove border
+    padding: 14,
+    paddingVertical: 14,
     marginRight: 10,
     borderRadius: 20,
-    backgroundColor: BUBL_COLORS.white,
-    fontSize: 15,
-    minHeight: 44,
+    backgroundColor: '#f9f9fa',
+    fontSize: 16, // Larger font size
+    minHeight: 50, // Taller input
     // The outline property isn't supported in React Native
     // Only apply it when on web platform
     ...(Platform.OS === 'web' ? {
@@ -1775,9 +1793,9 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     backgroundColor: BUBL_COLORS.mediumBlue,
-    borderRadius: 22,
-    width: 44,
-    height: 44,
+    borderRadius: 25,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2088,19 +2106,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     width: '100%',
     marginTop: 30,
-    paddingHorizontal: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: BUBL_COLORS.white,
+    borderRadius: 30,
+    // Add elevation/shadow to make it float
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 5,
+    ...(Platform.OS === 'web' ? {
+      boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.08)',
+    } : {}),
   },
   welcomeInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: BUBL_COLORS.border,
-    padding: 12,
+    borderWidth: 0, // Remove border
+    padding: 14,
     paddingVertical: 14,
     marginRight: 10,
     borderRadius: 20,
-    backgroundColor: '#f9f9f9',
-    fontSize: 16,
-    minHeight: 48,
+    backgroundColor: '#f9f9fa', // Slightly different background color
+    fontSize: 16, // Larger font size
+    minHeight: 50, // Taller input
     ...(Platform.OS === 'web' ? {
       outlineWidth: 0,
       outlineStyle: 'none'
@@ -2108,9 +2137,9 @@ const styles = StyleSheet.create({
   },
   welcomeSendButton: {
     backgroundColor: BUBL_COLORS.mediumBlue,
-    borderRadius: 24,
-    width: 48,
-    height: 48,
+    borderRadius: 25,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
