@@ -16,9 +16,21 @@ import {
   ScrollView,
   PanResponder,
   Keyboard,
-  Alert
+  Alert,
+  Image,
+  Easing
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+// Define Bubl brand colors
+const BUBL_COLORS = {
+  lightBlue: '#7fccf2',
+  mediumBlue: '#469fd9',
+  darkBlue: '#25669d',
+  white: '#ffffff',
+  lightGray: '#f7f7f8',
+  border: '#e5e5e7'
+};
 
 export default function App() {
   const [inputText, setInputText] = useState('');
@@ -32,6 +44,14 @@ export default function App() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingChatId, setEditingChatId] = useState(null);
+  const [animatedMessages, setAnimatedMessages] = useState({});
+  const [welcomeScreenFadeOut] = useState(new Animated.Value(1));
+  const [isAITyping, setIsAITyping] = useState(false);
+  const typingDots = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0)
+  ]).current;
   const flatListRef = useRef(null);
   const inputRef = useRef(null);
   const titleInputRef = useRef(null);
@@ -50,6 +70,48 @@ export default function App() {
   const currentChat = chatSessions.find(chat => chat.id === currentChatId);
   const messages = currentChat?.messages || [];
   const currentTitle = currentChat?.title || 'New Chat';
+
+  // Create a ref for the messages animation
+  const messageAnimations = useRef({}).current;
+  
+  // Helper function to create a new animation for a message
+  const createMessageAnimation = (messageId) => {
+    if (!messageAnimations[messageId]) {
+      messageAnimations[messageId] = {
+        opacity: new Animated.Value(0),
+        translateY: new Animated.Value(20),
+        scale: new Animated.Value(0.8)
+      };
+    }
+    return messageAnimations[messageId];
+  };
+  
+  // Helper function to animate a message entrance
+  const animateMessage = (messageId, delay = 0) => {
+    const animation = messageAnimations[messageId];
+    if (animation) {
+      Animated.parallel([
+        Animated.timing(animation.opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+          delay
+        }),
+        Animated.timing(animation.translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+          delay
+        }),
+        Animated.timing(animation.scale, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+          delay
+        })
+      ]).start();
+    }
+  };
 
   // Handle title editing
   const handleTitleEdit = () => {
@@ -74,16 +136,22 @@ export default function App() {
   // Control drawer animation
   useEffect(() => {
     if (showDrawer) {
-      Animated.timing(drawerAnimation, {
+      // Spring animation for opening drawer - more fluid and bouncy
+      Animated.spring(drawerAnimation, {
         toValue: 1,
-        duration: 250,
         useNativeDriver: Platform.OS !== 'web',
+        friction: 8,     // Controls "bounciness" - higher values = less bounce
+        tension: 40,     // Controls speed - higher values = more sudden movement
+        restDisplacementThreshold: 0.01, // Helps animation settle quickly
+        restSpeedThreshold: 0.01,        // Helps animation settle quickly
       }).start();
     } else {
+      // Timing animation with easing function for closing drawer
       Animated.timing(drawerAnimation, {
         toValue: 0,
-        duration: 250,
+        duration: 300,
         useNativeDriver: Platform.OS !== 'web',
+        easing: Easing.bezier(0.25, 1, 0.5, 1), // Custom bezier curve for smooth deceleration
       }).start();
     }
   }, [showDrawer, drawerAnimation]);
@@ -132,6 +200,76 @@ export default function App() {
     };
   }, []);
 
+  // Drawer-specific pan responder for handling swipes when drawer is open
+  const drawerPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Respond to horizontal movements for drawer
+        return Math.abs(gestureState.dx) > 5;
+      },
+      onPanResponderGrant: () => {
+        // Stop any running animations when user starts dragging
+        drawerAnimation.stopAnimation();
+        drawerAnimation.extractOffset();
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Calculate how far to move the drawer based on gesture
+        const maxDistance = drawerWidth;
+        let newPosition = gestureState.dx;
+        
+        // If drawer is open, adjust the translation value to start from fully open position
+        if (showDrawer) {
+          newPosition = Math.min(0, gestureState.dx); // Limit to leftward movement
+        } else {
+          newPosition = Math.max(0, gestureState.dx); // Limit to rightward movement
+          newPosition = Math.min(newPosition, maxDistance); // Don't drag beyond max width
+        }
+        
+        // Set the animation value directly for interactive feel
+        if (showDrawer) {
+          // If drawer is open, translate from 0 (open) to -drawerWidth (closed)
+          const normalizedValue = 1 - Math.abs(newPosition) / maxDistance;
+          drawerAnimation.setValue(Math.max(0, normalizedValue));
+        } else {
+          // If drawer is closed, translate from 0 (closed) to 1 (open)
+          const normalizedValue = newPosition / maxDistance;
+          drawerAnimation.setValue(normalizedValue);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // Remove any offset we added
+        drawerAnimation.flattenOffset();
+        
+        // Determine velocity direction and magnitude
+        const velocityThreshold = 0.3;
+        const gestureDistance = showDrawer ? -gestureState.dx : gestureState.dx;
+        const gesturePercentage = gestureDistance / drawerWidth;
+        const velocity = Math.abs(gestureState.vx);
+        
+        // Decide whether to open or close based on position and velocity
+        const shouldOpen = showDrawer 
+          ? gestureState.dx > -drawerWidth * 0.4 && velocity < velocityThreshold
+          : (gestureState.dx > drawerWidth * 0.4 || velocity > velocityThreshold);
+        
+        if (shouldOpen !== showDrawer) {
+          // State is changing, call toggle function
+          toggleDrawer();
+        } else {
+          // Animate back to current state with spring for smooth finish
+          Animated.spring(drawerAnimation, {
+            toValue: shouldOpen ? 1 : 0,
+            useNativeDriver: Platform.OS !== 'web',
+            friction: 8,
+            tension: 40,
+            restDisplacementThreshold: 0.01,
+            restSpeedThreshold: 0.01,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
   // Setup pan responder for swipe gestures
   const panResponder = useRef(
     PanResponder.create({
@@ -139,6 +277,10 @@ export default function App() {
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         // For downward swipes when keyboard is open, be more sensitive
         if (keyboardVisible && gestureState.dy > 5) {
+          return true;
+        }
+        // For horizontal swipes to open drawer, be more sensitive
+        if (Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
           return true;
         }
         // Otherwise only respond to significant movements
@@ -149,16 +291,33 @@ export default function App() {
         console.log("Gesture started");
       },
       onPanResponderMove: (evt, gestureState) => {
-        // If keyboard is visible and user is swiping down, make sure to capture it
+        // If this is a clear horizontal swipe and drawer is closed, start interactive animation
+        if (!showDrawer && gestureState.dx > 20 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2) {
+          // Set animation value proportional to swipe distance (0 to 1)
+          const openValue = Math.min(gestureState.dx / drawerWidth, 1);
+          drawerAnimation.setValue(openValue);
+        }
+        
+        // Handle keyboard dismiss
         if (keyboardVisible && gestureState.dy > 20) {
           console.log("Downward swipe detected while keyboard open");
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
-        console.log("Gesture released", gestureState.dy, keyboardVisible);
-        // Left to right swipe (open drawer)
+        // Left to right swipe (open drawer) with velocity check
         if (gestureState.dx > 50 && !showDrawer) {
           toggleDrawer();
+        } else if (gestureState.dx > 20 && gestureState.vx > 0.3 && !showDrawer) {
+          // Open drawer if swipe was fast enough, even if distance was shorter
+          toggleDrawer();
+        } else if (!showDrawer && gestureState.dx > 20) {
+          // If drawer was partially opened but not enough, animate back closed
+          Animated.spring(drawerAnimation, {
+            toValue: 0,
+            useNativeDriver: Platform.OS !== 'web',
+            friction: 8,
+            tension: 40,
+          }).start();
         }
         
         // Right to left swipe (close drawer)
@@ -180,26 +339,11 @@ export default function App() {
     })
   ).current;
 
-  // Drawer-specific pan responder for handling swipes when drawer is open
-  const drawerPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only respond to horizontal movements for drawer
-        return Math.abs(gestureState.dx) > 10;
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        // Right to left swipe (close drawer)
-        if (gestureState.dx < -50) {
-          toggleDrawer();
-        }
-      },
-    })
-  ).current;
-
   const translateX = drawerAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [-drawerWidth, 0],
+    // Add extrapolate: 'clamp' to prevent values outside range
+    extrapolate: 'clamp',
   });
 
   // Modify the `useEffect` that adds welcome messages
@@ -232,14 +376,87 @@ export default function App() {
     return mockResponses[randomIndex];
   };
 
+  // Add a function to animate the typing dots
+  const animateTypingDots = () => {
+    // Reset values
+    typingDots.forEach(dot => dot.setValue(0));
+    
+    // Sequence of animations for each dot
+    const animations = typingDots.map((dot, i) => {
+      return Animated.sequence([
+        Animated.delay(i * 200), // Stagger the start time
+        Animated.timing(dot, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true
+        }),
+        Animated.timing(dot, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true
+        })
+      ]);
+    });
+    
+    // Run the animation in a loop as long as typing is true
+    const loopAnimation = Animated.loop(
+      Animated.stagger(100, animations)
+    );
+    
+    loopAnimation.start();
+    
+    return loopAnimation;
+  };
+  
+  // Typing Indicator Component
+  const TypingIndicator = () => {
+    // Start animation when component mounts
+    useEffect(() => {
+      const animation = animateTypingDots();
+      return () => animation.stop();
+    }, []);
+    
+    return (
+      <View style={styles.typingIndicator}>
+        <View style={styles.typingAvatar}>
+          <Ionicons name="chatbubble-ellipses" size={16} color="#3b82f6" />
+        </View>
+        <View style={styles.typingDots}>
+          {typingDots.map((dot, index) => (
+            <Animated.View 
+              key={index} 
+              style={[
+                styles.typingDot,
+                {
+                  opacity: dot,
+                  transform: [{
+                    translateY: dot.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -5]
+                    })
+                  }]
+                }
+              ]} 
+            />
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  // Modify the sendMessage function to show typing indicator
   const sendMessage = () => {
     if (inputText.trim()) {
       // Add user message
+      const userMessageId = Date.now().toString();
       const userMessage = {
-        id: Date.now().toString(),
+        id: userMessageId,
         text: inputText,
         isUser: true,
       };
+      
+      // Create animation for user message
+      createMessageAnimation(userMessageId);
       
       // Check if this is the first message in the chat
       const isFirstMessage = currentChat.messages.length === 0;
@@ -256,18 +473,31 @@ export default function App() {
         });
       });
       
+      // Start animation for user message immediately
+      setTimeout(() => animateMessage(userMessageId), 50);
+      
       setInputText('');
+      
+      // Show typing indicator
+      setIsAITyping(true);
       
       // Add AI response after a short delay to simulate thinking
       setTimeout(() => {
+        // Hide typing indicator before adding the AI message
+        setIsAITyping(false);
+        
         // If this is the first message, send a welcome message
+        const aiMessageId = (Date.now() + 1).toString();
         const aiMessage = {
-          id: (Date.now() + 1).toString(),
+          id: aiMessageId,
           text: isFirstMessage 
             ? "Hello! I'm your friendly chatbot assistant. How can I help you today?" 
             : getRandomResponse(),
           isUser: false,
         };
+        
+        // Create animation for AI message
+        createMessageAnimation(aiMessageId);
         
         setChatSessions(prevSessions => {
           const newSessions = prevSessions.map(session => {
@@ -282,9 +512,13 @@ export default function App() {
           
           // Scroll to the latest message in the next render cycle
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+          
+          // Start animation for AI message after a slight delay
+          setTimeout(() => animateMessage(aiMessageId), 50);
+          
           return newSessions;
         });
-      }, 1000);
+      }, 1500); // Slightly longer delay to make typing indicator visible
     }
   };
 
@@ -325,7 +559,12 @@ export default function App() {
     if (keyboardVisible) {
       Keyboard.dismiss();
     }
+    
+    // Update state
     setShowDrawer(!showDrawer);
+    
+    // The animation is already handled by useEffect based on the showDrawer state
+    // The animation is now more responsive because it reacts to the state change
   };
 
   const deleteChat = (chatId) => {
@@ -378,11 +617,11 @@ export default function App() {
           {/* Bottom buttons */}
           <View style={styles.voiceButtonsContainer}>
             <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7}>
-              <Ionicons name="videocam" size={24} color="#fff" />
+              <Image source={require('./assets/video_icon.png')} style={styles.voiceIcon} />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7}>
-              <Ionicons name="mic" size={24} color="#fff" />
+              <Image source={require('./assets/call_icon.png')} style={styles.voiceIcon} />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7}>
@@ -402,7 +641,7 @@ export default function App() {
     );
   };
 
-  // EmptyChatScreen component for displaying when there are no messages
+  // Update EmptyChatScreen component's handleSubmit to show typing indicator too
   const EmptyChatScreen = ({ chatTitle }) => {
     // Use local state for this component
     const [localInputText, setLocalInputText] = useState('');
@@ -417,11 +656,15 @@ export default function App() {
         setLocalInputText('');
         
         // Add user message directly
+        const userMessageId = Date.now().toString();
         const userMessage = {
-          id: Date.now().toString(),
+          id: userMessageId,
           text: messageText,
           isUser: true,
         };
+        
+        // Create animation for user message
+        createMessageAnimation(userMessageId);
         
         // Check if this is the first message in the chat
         const isFirstMessage = currentChat.messages.length === 0;
@@ -438,15 +681,28 @@ export default function App() {
           });
         });
         
+        // Start animation for user message
+        setTimeout(() => animateMessage(userMessageId), 50);
+        
+        // Show typing indicator
+        setIsAITyping(true);
+        
         // Add AI response after a short delay to simulate thinking
         setTimeout(() => {
+          // Hide typing indicator before adding the AI message
+          setIsAITyping(false);
+          
+          const aiMessageId = (Date.now() + 1).toString();
           const aiMessage = {
-            id: (Date.now() + 1).toString(),
+            id: aiMessageId,
             text: isFirstMessage 
               ? "Hello! I'm your friendly chatbot assistant. How can I help you today?" 
               : getRandomResponse(),
             isUser: false,
           };
+          
+          // Create animation for AI message
+          createMessageAnimation(aiMessageId);
           
           setChatSessions(prevSessions => {
             const newSessions = prevSessions.map(session => {
@@ -461,9 +717,13 @@ export default function App() {
             
             // Scroll to the latest message in the next render cycle
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+            
+            // Start animation for AI message
+            setTimeout(() => animateMessage(aiMessageId), 50);
+            
             return newSessions;
           });
-        }, 1000);
+        }, 1500); // Longer delay to make typing indicator visible
       }
     };
     
@@ -476,12 +736,21 @@ export default function App() {
           accessibilityLabel="Open menu"
           accessibilityRole="button"
         >
-          <Ionicons name="menu" size={24} color="#3b82f6" />
+          <Ionicons name="menu" size={24} color={BUBL_COLORS.mediumBlue} />
         </TouchableOpacity>
         
+        {/* Logo at the top of the empty chat screen */}
+        <View style={styles.welcomeLogoTopContainer}>
+          <Image 
+            source={require('./assets/BublChat_logo_MAIN.png')} 
+            style={styles.welcomeTopLogo}
+            resizeMode="contain"
+          />
+        </View>
+        
         <View style={styles.welcomeContainer}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="chatbubble-ellipses" size={60} color="#3b82f6" />
+          <View style={styles.welcomeLogoContainer}>
+            <Ionicons name="chatbubble-ellipses" size={60} color={BUBL_COLORS.mediumBlue} />
           </View>
           <Text style={styles.welcomeText}>
             How may I help you?
@@ -510,9 +779,9 @@ export default function App() {
               accessibilityRole="button"
             >
               {localInputText.trim() ? (
-                <Ionicons name="arrow-up" size={24} color="#fff" />
+                <Image source={require('./assets/send_icon.png')} style={styles.welcomeIcon} />
               ) : (
-                <Ionicons name="mic" size={22} color="#fff" />
+                <Image source={require('./assets/call_icon.png')} style={styles.welcomeIcon} />
               )}
             </TouchableOpacity>
           </View>
@@ -525,10 +794,10 @@ export default function App() {
   const DrawerMenu = () => {
     return (
       <>
-        {/* Only show overlay on non-web platforms */}
+        {/* Only show overlay on non-web platforms when drawer is open */}
         {showDrawer && Platform.OS !== 'web' && (
           <TouchableOpacity 
-            style={styles.overlay} 
+            style={{ width: '100%', height: '100%', position: 'absolute', left: 0, top: 0, zIndex: 1 }}
             activeOpacity={1} 
             onPress={toggleDrawer}
             {...drawerPanResponder.panHandlers}
@@ -537,32 +806,37 @@ export default function App() {
         <Animated.View 
           style={[
             styles.drawer,
-            Platform.OS === 'web' 
-              ? {
-                  width: drawerWidth,
-                  left: drawerAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-drawerWidth, 0],
-                  }),
-                  zIndex: 10,
-                }
-              : {
-                  width: drawerWidth,
-                  transform: [{ 
-                    translateX: drawerAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-drawerWidth, 0],
-                    }) 
-                  }],
-                }
+            {
+              transform: [{ 
+                translateX: drawerAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-drawerWidth, 0],
+                  extrapolate: 'clamp',
+                }) 
+              }],
+              width: drawerWidth,
+              // Add shadow props for native platforms
+              shadowColor: "#000",
+              shadowOffset: { width: 5, height: 0 },
+              shadowOpacity: 0.25,
+              shadowRadius: 10,
+              elevation: 10,
+            }
           ]}
           {...drawerPanResponder.panHandlers}
         >
           <SafeAreaView style={styles.drawerContent}>
+            {/* Bubl Logo Header */}
+            <View style={styles.drawerHeader}>
+              <View style={styles.logoContainer}>
+                <Image source={require('./assets/BublChat_logo.png')} style={styles.logo} />
+              </View>
+            </View>
+            
             {/* Search Bar */}
             <View style={styles.searchContainer}>
               <View style={styles.searchBar}>
-                <Ionicons name="search" size={22} color="#3b82f6" style={styles.searchIcon} />
+                <Ionicons name="search" size={22} color={BUBL_COLORS.mediumBlue} style={styles.searchIcon} />
                 <Text style={styles.searchPlaceholder}>Search</Text>
               </View>
               <TouchableOpacity 
@@ -571,7 +845,7 @@ export default function App() {
                 accessibilityLabel="Create new chat"
                 accessibilityRole="button"
               >
-                <Ionicons name="add" size={28} color="#3b82f6" />
+                <Ionicons name="add" size={28} color={BUBL_COLORS.mediumBlue} />
               </TouchableOpacity>
             </View>
             
@@ -585,13 +859,13 @@ export default function App() {
                   ]}>
                     <TouchableOpacity 
                       style={styles.chatIconContainer}
-                  onPress={() => switchChat(chat.id)}
-                >
-                  <View style={styles.chatIcon}>
-                    <Ionicons name="chatbubble-ellipses-outline" size={22} color="#3b82f6" />
-                  </View>
+                      onPress={() => switchChat(chat.id)}
+                    >
+                      <View style={styles.chatIcon}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={22} color={BUBL_COLORS.mediumBlue} />
+                      </View>
                     </TouchableOpacity>
-                  <View style={styles.chatItemContent}>
+                    <View style={styles.chatItemContent}>
                       {editingChatId === chat.id ? (
                         <TextInput
                           style={[
@@ -644,26 +918,25 @@ export default function App() {
                         </TouchableOpacity>
                       )}
                       <TouchableOpacity onPress={() => switchChat(chat.id)}>
-                    <Text style={styles.chatPreview} numberOfLines={1}>
-                      {chat.messages.length > 0 
-                        ? chat.messages[chat.messages.length - 1].text
-                        : 'New conversation'}
-                    </Text>
+                        <Text style={styles.chatPreview} numberOfLines={1}>
+                          {chat.messages.length > 0 
+                            ? chat.messages[chat.messages.length - 1].text
+                            : 'New conversation'}
+                        </Text>
                       </TouchableOpacity>
-                  </View>
+                    </View>
                   </View>
                   <TouchableOpacity 
                     style={styles.chatMenuButton}
                     onPress={(e) => {
                       e.stopPropagation();
-                      // Call deleteChat directly - logic is now handled inside the function
                       deleteChat(chat.id);
                     }}
                     accessibilityLabel="Delete chat"
                     accessibilityRole="button"
                   >
                     <Ionicons name="trash-outline" size={20} color="#ff4757" />
-                </TouchableOpacity>
+                  </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
@@ -686,7 +959,16 @@ export default function App() {
 
   useEffect(() => {
     // When messages change from 0 to more, animate the header in
+    // and animate the welcome screen out
     if (messages.length === 1) {
+      // Animate welcome screen out
+      Animated.timing(welcomeScreenFadeOut, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      
+      // Animate header in
       Animated.timing(headerAnimation, {
         toValue: 1,
         duration: 300,
@@ -694,6 +976,46 @@ export default function App() {
       }).start();
     }
   }, [messages.length]);
+
+  // Replace the message rendering inside FlatList renderItem
+  const renderMessage = ({ item, index }) => {
+    // Create animation if it doesn't exist
+    if (!messageAnimations[item.id]) {
+      createMessageAnimation(item.id);
+      // Stagger animation based on index for initial load
+      setTimeout(() => animateMessage(item.id, index * 50), 50);
+    }
+    
+    const animation = messageAnimations[item.id];
+    
+    // Check if this message is part of a consecutive series from same sender
+    const isConsecutive = index > 0 && messages[index - 1].isUser === item.isUser;
+    
+    return (
+      <Animated.View 
+        style={[
+          styles.messageBubble,
+          item.isUser ? styles.userMessage : styles.aiMessage,
+          { 
+            maxWidth: width * 0.75,
+            marginTop: isConsecutive ? 2 : 8, // Reduce margin for consecutive messages
+          },
+          {
+            opacity: animation.opacity,
+            transform: [
+              { translateY: animation.translateY },
+              { scale: animation.scale }
+            ]
+          }
+        ]}
+      >
+        <Text style={[
+          styles.messageText,
+          item.isUser ? styles.userMessageText : styles.aiMessageText
+        ]}>{item.text}</Text>
+      </Animated.View>
+    );
+  };
 
   return (
     <SafeAreaView style={[
@@ -800,31 +1122,34 @@ export default function App() {
                 )}
                 
                 {messages.length === 0 ? (
-                  <EmptyChatScreen chatTitle={currentTitle} />
+                  <Animated.View style={{ flex: 1, opacity: welcomeScreenFadeOut }}>
+                    <EmptyChatScreen chatTitle={currentTitle} />
+                  </Animated.View>
                 ) : (
-                  <FlatList
-                    ref={flatListRef}
-                    style={styles.chatList}
-                    data={messages}
-                    renderItem={({ item }) => (
-                      <View style={[
-                        styles.messageBubble, 
-                        item.isUser ? styles.userMessage : styles.aiMessage,
-                        { maxWidth: width * 0.75 }
-                      ]}>
-                        <Text style={[
-                          styles.messageText,
-                          item.isUser ? styles.userMessageText : styles.aiMessageText
-                        ]}>{item.text}</Text>
+                  <>
+                    <FlatList
+                      ref={flatListRef}
+                      style={styles.chatList}
+                      data={messages}
+                      renderItem={renderMessage}
+                      keyExtractor={item => item.id}
+                      contentContainerStyle={[
+                        styles.chatContent,
+                        isAITyping && { paddingBottom: 50 } // Add space for typing indicator
+                      ]}
+                      onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                      onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                      showsVerticalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                    />
+                    
+                    {/* Typing indicator */}
+                    {isAITyping && (
+                      <View style={styles.typingIndicatorContainer}>
+                        <TypingIndicator />
                       </View>
                     )}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.chatContent}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                  />
+                  </>
                 )}
               </View>
               
@@ -853,9 +1178,9 @@ export default function App() {
                     accessibilityRole="button"
                   >
                     {inputText.trim() ? (
-                      <Ionicons name="arrow-up" size={24} color="#fff" />
+                      <Image source={require('./assets/send_icon.png')} style={styles.icon} />
                     ) : (
-                      <Ionicons name="mic" size={22} color="#fff" />
+                      <Image source={require('./assets/call_icon.png')} style={styles.icon} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -865,10 +1190,45 @@ export default function App() {
               <VoiceChatModal />
             </View>
             
-            {/* Drawer - simplified for web */}
-            {showDrawer && (
-              <View style={[styles.webDrawer, { width: drawerWidth }]}>
+            {/* Web-specific overlay - only include touchable area without background dimming */}
+            {Platform.OS === 'web' && showDrawer && (
+              <TouchableOpacity 
+                style={{
+                  position: 'absolute',
+                  width: '100%', 
+                  height: '100%',
+                  zIndex: 5,
+                  backgroundColor: 'transparent'
+                }}
+                activeOpacity={1}
+                onPress={toggleDrawer}
+              />
+            )}
+            
+            {/* Drawer - web version */}
+            {Platform.OS === 'web' && (
+              <View 
+                style={[
+                  styles.webDrawer, 
+                  { 
+                    width: drawerWidth,
+                    transform: showDrawer ? 
+                      [{translateX: '0%'}] : 
+                      [{translateX: '-100%'}],
+                    boxShadow: showDrawer ? 
+                      '0px 0px 20px rgba(0, 0, 0, 0.25)' : 
+                      '0px 0px 0px rgba(0, 0, 0, 0)'
+                  }
+                ]}
+              >
                 <SafeAreaView style={styles.drawerContent}>
+                  {/* Bubl Logo Header */}
+                  <View style={styles.drawerHeader}>
+                    <View style={styles.logoContainer}>
+                      <Image source={require('./assets/BublChat_logo.png')} style={styles.logo} />
+                    </View>
+                  </View>
+                  
                   {/* Search Bar */}
                   <View style={styles.searchContainer}>
                     <View style={styles.searchBar}>
@@ -966,7 +1326,6 @@ export default function App() {
                           style={styles.chatMenuButton}
                           onPress={(e) => {
                             e.stopPropagation();
-                            // Call deleteChat directly - logic is now handled inside the function
                             deleteChat(chat.id);
                           }}
                           accessibilityLabel="Delete chat"
@@ -1080,31 +1439,34 @@ export default function App() {
           )}
           
               {messages.length === 0 ? (
-                <EmptyChatScreen chatTitle={currentTitle} />
+                <Animated.View style={{ flex: 1, opacity: welcomeScreenFadeOut }}>
+                  <EmptyChatScreen chatTitle={currentTitle} />
+                </Animated.View>
               ) : (
-          <FlatList
-            ref={flatListRef}
-            style={styles.chatList}
-            data={messages}
-            renderItem={({ item }) => (
-              <View style={[
-                styles.messageBubble, 
-                item.isUser ? styles.userMessage : styles.aiMessage,
-                { maxWidth: width * 0.75 }
-              ]}>
-                <Text style={[
-                  styles.messageText,
-                  item.isUser ? styles.userMessageText : styles.aiMessageText
-                ]}>{item.text}</Text>
-              </View>
-            )}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.chatContent}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-            onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          />
+                <>
+                  <FlatList
+                    ref={flatListRef}
+                    style={styles.chatList}
+                    data={messages}
+                    renderItem={renderMessage}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={[
+                      styles.chatContent,
+                      isAITyping && { paddingBottom: 50 } // Add space for typing indicator
+                    ]}
+                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  />
+                  
+                  {/* Typing indicator */}
+                  {isAITyping && (
+                    <View style={styles.typingIndicatorContainer}>
+                      <TypingIndicator />
+                    </View>
+                  )}
+                </>
               )}
         </View>
         
@@ -1133,9 +1495,9 @@ export default function App() {
             accessibilityRole="button"
           >
             {inputText.trim() ? (
-              <Ionicons name="arrow-up" size={24} color="#fff" />
+              <Image source={require('./assets/send_icon.png')} style={styles.icon} />
             ) : (
-              <Ionicons name="mic" size={22} color="#fff" />
+              <Image source={require('./assets/call_icon.png')} style={styles.icon} />
             )}
           </TouchableOpacity>
         </View>
@@ -1153,6 +1515,7 @@ export default function App() {
                     translateX: drawerAnimation.interpolate({
                       inputRange: [0, 1],
                       outputRange: [-drawerWidth, 0],
+                      extrapolate: 'clamp',
                     }) 
                   }],
                   width: drawerWidth
@@ -1160,10 +1523,17 @@ export default function App() {
               ]}
             >
               <SafeAreaView style={styles.drawerContent}>
+                {/* Bubl Logo Header */}
+                <View style={styles.drawerHeader}>
+                  <View style={styles.logoContainer}>
+                    <Image source={require('./assets/BublChat_logo.png')} style={styles.logo} />
+                  </View>
+                </View>
+                
                 {/* Search Bar */}
                 <View style={styles.searchContainer}>
                   <View style={styles.searchBar}>
-                    <Ionicons name="search" size={22} color="#3b82f6" style={styles.searchIcon} />
+                    <Ionicons name="search" size={22} color={BUBL_COLORS.mediumBlue} style={styles.searchIcon} />
                     <Text style={styles.searchPlaceholder}>Search</Text>
                   </View>
                   <TouchableOpacity 
@@ -1172,7 +1542,7 @@ export default function App() {
                     accessibilityLabel="Create new chat"
                     accessibilityRole="button"
                   >
-                    <Ionicons name="add" size={28} color="#3b82f6" />
+                    <Ionicons name="add" size={28} color={BUBL_COLORS.mediumBlue} />
                   </TouchableOpacity>
                 </View>
                 
@@ -1189,7 +1559,7 @@ export default function App() {
                           onPress={() => switchChat(chat.id)}
                         >
                           <View style={styles.chatIcon}>
-                            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#3b82f6" />
+                            <Ionicons name="chatbubble-ellipses-outline" size={22} color={BUBL_COLORS.mediumBlue} />
                           </View>
                         </TouchableOpacity>
                         <View style={styles.chatItemContent}>
@@ -1282,10 +1652,16 @@ export default function App() {
               </SafeAreaView>
             </Animated.View>
             
-            {/* Overlay when drawer is open */}
+            {/* Overlay when drawer is open - transparent */}
             {showDrawer && (
               <TouchableOpacity
-                style={styles.overlay}
+                style={{ 
+                  position: 'absolute',
+                  width: '100%', 
+                  height: '100%',
+                  zIndex: 1,
+                  backgroundColor: 'transparent'
+                }}
                 activeOpacity={1}
                 onPress={toggleDrawer}
               />
@@ -1300,57 +1676,68 @@ export default function App() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#3b82f6',
+    backgroundColor: BUBL_COLORS.mediumBlue,
   },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: BUBL_COLORS.white,
   },
   headerContainer: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: BUBL_COLORS.mediumBlue,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 15,
     paddingTop: Platform.OS === 'ios' ? 10 : 50,
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: BUBL_COLORS.lightBlue,
   },
   header: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: BUBL_COLORS.white,
   },
   chatList: {
     flex: 1,
     width: '100%',
-    padding: 15,
+    backgroundColor: BUBL_COLORS.white,
   },
   chatContent: {
-    paddingBottom: 10,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
   },
   messageBubble: {
     padding: 14,
-    borderRadius: 20,
+    borderRadius: 18,
     marginVertical: 8,
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: 'center',
+    maxWidth: '80%',
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#3b82f6',
-    marginLeft: 50,
+    backgroundColor: BUBL_COLORS.mediumBlue,
+    borderRadius: 18,
+    marginVertical: 4,
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#e5e5ea',
-    marginRight: 50,
+    backgroundColor: BUBL_COLORS.lightBlue,
+    borderRadius: 18,
+    marginVertical: 4,
   },
   userMessageText: {
-    color: '#fff',
+    color: BUBL_COLORS.white,
+    fontSize: 16,
+    lineHeight: 22,
   },
   aiMessageText: {
     color: '#000',
+    fontSize: 16,
+    lineHeight: 22,
   },
   messageText: {
     fontSize: 16,
@@ -1359,36 +1746,40 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
     padding: 10,
     paddingBottom: Platform.OS === 'ios' ? 30 : 10,
     borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    backgroundColor: '#fff',
+    borderTopColor: BUBL_COLORS.border,
+    backgroundColor: BUBL_COLORS.white,
+    paddingHorizontal: 16,
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: BUBL_COLORS.border,
     padding: 12,
-    paddingVertical: 14,
+    paddingVertical: 12,
     marginRight: 10,
     borderRadius: 20,
-    backgroundColor: '#f9f9f9',
-    fontSize: 16,
-    minHeight: 48,
+    backgroundColor: BUBL_COLORS.white,
+    fontSize: 15,
+    minHeight: 44,
+    // The outline property isn't supported in React Native
+    // Only apply it when on web platform
+    ...(Platform.OS === 'web' ? {
+      outlineWidth: 0,
+      outlineStyle: 'none'
+    } : {}),
   },
   sendButton: {
-    backgroundColor: '#3b82f6',
-    borderRadius: 30,
-    width: 48,
-    height: 48,
+    backgroundColor: BUBL_COLORS.mediumBlue,
+    borderRadius: 22,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   // Voice modal styles
   voiceModalContainer: {
@@ -1402,7 +1793,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: '#3b82f6',
+    backgroundColor: BUBL_COLORS.mediumBlue,
     marginTop: '50%',
     opacity: 0.8,
   },
@@ -1433,20 +1824,38 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0)',
     zIndex: 1,
   },
   drawer: {
     position: 'absolute',
     height: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: BUBL_COLORS.white,
     zIndex: 2,
-    borderRightWidth: 1,
-    borderRightColor: '#eee',
   },
   drawerContent: {
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  drawerHeader: {
+    backgroundColor: BUBL_COLORS.lightBlue,
+    padding: 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  logoContainer: {
+    width: 360,
+    height: 140,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -1454,14 +1863,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#3b82f6',
+    borderBottomColor: BUBL_COLORS.border,
+    backgroundColor: BUBL_COLORS.lightBlue,
   },
   searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: BUBL_COLORS.white,
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 15,
@@ -1469,14 +1878,14 @@ const styles = StyleSheet.create({
   },
   searchIcon: {
     marginRight: 8,
-    color: '#3b82f6',
+    color: BUBL_COLORS.mediumBlue,
   },
   searchPlaceholder: {
     color: '#888',
     fontSize: 16,
   },
   createButton: {
-    backgroundColor: '#fff',
+    backgroundColor: BUBL_COLORS.white,
     borderRadius: 25,
     width: 40,
     height: 40,
@@ -1492,20 +1901,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#fff',
+    borderTopColor: BUBL_COLORS.border,
+    backgroundColor: BUBL_COLORS.white,
   },
   userAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#3b82f6',
+    backgroundColor: BUBL_COLORS.mediumBlue,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   userInitial: {
-    color: '#fff',
+    color: BUBL_COLORS.white,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -1535,7 +1944,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   keyboardDismissButton: {
-    backgroundColor: 'rgba(59, 130, 246, 0.9)',
+    backgroundColor: `rgba(${parseInt(BUBL_COLORS.mediumBlue.slice(1, 3), 16)}, ${parseInt(BUBL_COLORS.mediumBlue.slice(3, 5), 16)}, ${parseInt(BUBL_COLORS.mediumBlue.slice(5, 7), 16)}, 0.9)`,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1550,21 +1959,21 @@ const styles = StyleSheet.create({
   chatItemWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: BUBL_COLORS.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: BUBL_COLORS.border,
   },
   chatItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: BUBL_COLORS.white,
   },
   activeChatItem: {
     backgroundColor: '#f0f9ff',
     borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
+    borderLeftColor: BUBL_COLORS.mediumBlue,
   },
   chatIcon: {
     width: 40,
@@ -1587,7 +1996,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   activeChatTitle: {
-    color: '#3b82f6',
+    color: BUBL_COLORS.mediumBlue,
   },
   chatPreview: {
     fontSize: 14,
@@ -1602,12 +2011,16 @@ const styles = StyleSheet.create({
   headerTitleInput: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: BUBL_COLORS.white,
     minWidth: 120,
     textAlign: 'center',
     padding: 0,
     borderBottomWidth: 2,
     borderBottomColor: 'rgba(255, 255, 255, 0.5)',
+    ...(Platform.OS === 'web' ? {
+      outlineWidth: 0,
+      outlineStyle: 'none'
+    } : {}),
   },
   editIcon: {
     marginLeft: 8,
@@ -1625,9 +2038,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: BUBL_COLORS.white,
+  },
+  welcomeLogoTopContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 400,
+  },
+  welcomeTopLogo: {
+    width: 280,
+    height: 100,
   },
   welcomeContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: BUBL_COLORS.white,
     borderRadius: 20,
     padding: 30,
     paddingBottom: 40,
@@ -1640,11 +2066,11 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
-  logoContainer: {
+  welcomeLogoContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: BUBL_COLORS.lightBlue,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -1667,7 +2093,7 @@ const styles = StyleSheet.create({
   welcomeInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: BUBL_COLORS.border,
     padding: 12,
     paddingVertical: 14,
     marginRight: 10,
@@ -1675,10 +2101,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9f9f9',
     fontSize: 16,
     minHeight: 48,
+    ...(Platform.OS === 'web' ? {
+      outlineWidth: 0,
+      outlineStyle: 'none'
+    } : {}),
   },
   welcomeSendButton: {
-    backgroundColor: '#3b82f6',
-    borderRadius: 30,
+    backgroundColor: BUBL_COLORS.mediumBlue,
+    borderRadius: 24,
     width: 48,
     height: 48,
     justifyContent: 'center',
@@ -1686,7 +2116,7 @@ const styles = StyleSheet.create({
   },
   // New styles for empty screen
   safeAreaNoHeader: {
-    backgroundColor: '#f5f5f5', // Match container background instead of blue
+    backgroundColor: BUBL_COLORS.white,
   },
   emptyScreenMenuButton: {
     position: 'absolute',
@@ -1695,7 +2125,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 10,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: BUBL_COLORS.white,
     ...(Platform.OS === 'web' 
       ? { boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.2)' }
       : {
@@ -1715,18 +2145,78 @@ const styles = StyleSheet.create({
   },
   webContent: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    transition: 'margin 0.25s, width 0.25s', // CSS transition for smooth animation on web
+    backgroundColor: BUBL_COLORS.white,
+    transition: 'margin 0.35s cubic-bezier(0.16, 1, 0.3, 1), width 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+  },
+  webOverlay: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0)',
+    zIndex: 5,
+    transition: 'opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
   },
   webDrawer: {
-    backgroundColor: '#fff',
+    backgroundColor: BUBL_COLORS.white,
     height: '100%',
-    borderRightWidth: 1,
-    borderRightColor: '#eee',
-    boxShadow: '0px 0px 10px rgba(0, 0, 0, 0.1)',
     position: 'absolute',
     left: 0,
     top: 0,
     zIndex: 10,
+    transition: 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease',
+  },
+  // Add typing indicator styles
+  typingIndicatorContainer: {
+    position: 'absolute',
+    bottom: 10,
+    left: 15,
+    zIndex: 1,
+  },
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: BUBL_COLORS.lightBlue,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    maxWidth: 100,
+  },
+  typingAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: BUBL_COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  typingDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: BUBL_COLORS.mediumBlue,
+    marginHorizontal: 2,
+  },
+  // Icon styles
+  icon: {
+    width: 36,
+    height: 36,
+    resizeMode: 'contain',
+  },
+  // Slightly larger icon for the welcome screen buttons
+  welcomeIcon: {
+    width: 42,
+    height: 42,
+    resizeMode: 'contain',
+  },
+  // Icon for the voice chat modal
+  voiceIcon: {
+    width: 48,
+    height: 48,
+    resizeMode: 'contain',
   },
 });
