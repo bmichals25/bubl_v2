@@ -15,23 +15,61 @@ import {
   Animated,
   ScrollView,
   PanResponder,
-  Keyboard
+  Keyboard,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function App() {
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState([]);
+  const [chatSessions, setChatSessions] = useState([
+    {id: '1', title: 'Chat 1', messages: []}
+  ]);
+  const [currentChatId, setCurrentChatId] = useState('1');
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [editingChatId, setEditingChatId] = useState(null);
   const flatListRef = useRef(null);
   const inputRef = useRef(null);
+  const titleInputRef = useRef(null);
   const drawerAnimation = useRef(new Animated.Value(0)).current;
   const dismissButtonAnimation = useRef(new Animated.Value(0)).current;
+  const headerAnimation = useRef(new Animated.Value(0)).current;
+  const contentAnimation = useRef(new Animated.Value(0)).current;
   const { width, height } = Dimensions.get('window');
   
-  const drawerWidth = width * 0.75;
+  // Update drawer width calculation to be responsive based on platform
+  const drawerWidth = Platform.OS === 'web' 
+    ? width * 0.25 // Web: 25% of screen width (quarter)
+    : width * 0.75; // iOS/Android: 75% of screen width (unchanged)
+
+  // Get the current chat's messages and title
+  const currentChat = chatSessions.find(chat => chat.id === currentChatId);
+  const messages = currentChat?.messages || [];
+  const currentTitle = currentChat?.title || 'New Chat';
+
+  // Handle title editing
+  const handleTitleEdit = () => {
+    setEditingTitle(currentTitle);
+    setIsEditingTitle(true);
+    setTimeout(() => titleInputRef.current?.focus(), 100);
+  };
+
+  const saveTitleEdit = () => {
+    if (editingTitle.trim()) {
+      setChatSessions(prevSessions => 
+        prevSessions.map(session => 
+          session.id === currentChatId 
+            ? { ...session, title: editingTitle.trim() }
+            : session
+        )
+      );
+    }
+    setIsEditingTitle(false);
+  };
 
   // Control drawer animation
   useEffect(() => {
@@ -39,13 +77,13 @@ export default function App() {
       Animated.timing(drawerAnimation, {
         toValue: 1,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     } else {
       Animated.timing(drawerAnimation, {
         toValue: 0,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
   }, [showDrawer, drawerAnimation]);
@@ -164,14 +202,17 @@ export default function App() {
     outputRange: [-drawerWidth, 0],
   });
 
-  // Add welcome message when app loads
+  // Modify the `useEffect` that adds welcome messages
+  // Find the useEffect with welcome message logic and replace it
+
   useEffect(() => {
-    const welcomeMessage = {
-      id: 'welcome',
-      text: "Hello! I'm your friendly chatbot assistant. How can I help you today?",
-      isUser: false,
-    };
-    setMessages([welcomeMessage]);
+    // Initialize the app with an empty chat if needed
+    if (chatSessions.length === 0) {
+      setChatSessions([
+        {id: '1', title: 'New Chat', messages: []}
+      ]);
+      setCurrentChatId('1');
+    }
   }, []);
 
   // Mock AI responses
@@ -200,23 +241,74 @@ export default function App() {
         isUser: true,
       };
       
-      setMessages(prevMessages => [...prevMessages, userMessage]);
+      // Check if this is the first message in the chat
+      const isFirstMessage = currentChat.messages.length === 0;
+      
+      setChatSessions(prevSessions => {
+        return prevSessions.map(session => {
+          if (session.id === currentChatId) {
+            return {
+              ...session,
+              messages: [...session.messages, userMessage]
+            };
+          }
+          return session;
+        });
+      });
+      
       setInputText('');
       
       // Add AI response after a short delay to simulate thinking
       setTimeout(() => {
+        // If this is the first message, send a welcome message
         const aiMessage = {
           id: (Date.now() + 1).toString(),
-          text: getRandomResponse(),
+          text: isFirstMessage 
+            ? "Hello! I'm your friendly chatbot assistant. How can I help you today?" 
+            : getRandomResponse(),
           isUser: false,
         };
-        setMessages(prevMessages => {
-          const newMessages = [...prevMessages, aiMessage];
+        
+        setChatSessions(prevSessions => {
+          const newSessions = prevSessions.map(session => {
+            if (session.id === currentChatId) {
+              return {
+                ...session,
+                messages: [...session.messages, aiMessage]
+              };
+            }
+            return session;
+          });
+          
           // Scroll to the latest message in the next render cycle
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-          return newMessages;
+          return newSessions;
         });
       }, 1000);
+    }
+  };
+
+  const createNewChat = () => {
+    const newChatId = Date.now().toString();
+    
+    setChatSessions(prevSessions => [
+      ...prevSessions,
+      {
+        id: newChatId,
+        title: 'New Chat',
+        messages: []
+      }
+    ]);
+    
+    setCurrentChatId(newChatId);
+    setShowDrawer(false); // Close drawer after creating new chat
+  };
+
+  const switchChat = (chatId) => {
+    // Only switch and close drawer if we're not editing a title
+    if (!isEditingTitle) {
+    setCurrentChatId(chatId);
+    setShowDrawer(false); // Close drawer after switching chat
     }
   };
 
@@ -234,6 +326,38 @@ export default function App() {
       Keyboard.dismiss();
     }
     setShowDrawer(!showDrawer);
+  };
+
+  const deleteChat = (chatId) => {
+    if (chatSessions.length > 1) {
+      setChatSessions(prevSessions => {
+        const newSessions = prevSessions.filter(session => session.id !== chatId);
+        
+        // If we're deleting the current chat, set a new current chat ID
+        if (currentChatId === chatId) {
+          // Find the first chat that's not the one being deleted
+          const newCurrentChat = newSessions.find(session => session.id !== chatId) || newSessions[0];
+          setTimeout(() => setCurrentChatId(newCurrentChat.id), 0);
+        }
+        
+        return newSessions;
+      });
+    } else {
+      // If there's only one chat, create a new one before deleting the current one
+      const newChatId = Date.now().toString();
+      
+      setChatSessions([
+        {
+          id: newChatId,
+          title: 'New Chat',
+          messages: []
+        }
+      ]);
+      
+      setCurrentChatId(newChatId);
+    }
+    // Close drawer after deleting a chat
+    setShowDrawer(false);
   };
 
   // Voice Chat Modal Component
@@ -278,11 +402,131 @@ export default function App() {
     );
   };
 
+  // EmptyChatScreen component for displaying when there are no messages
+  const EmptyChatScreen = ({ chatTitle }) => {
+    // Use local state for this component
+    const [localInputText, setLocalInputText] = useState('');
+    
+    // Handle submit from this component
+    const handleSubmit = () => {
+      if (localInputText.trim()) {
+        // Instead of updating parent state first, use the local value directly
+        const messageText = localInputText;
+        
+        // Clear local input immediately
+        setLocalInputText('');
+        
+        // Add user message directly
+        const userMessage = {
+          id: Date.now().toString(),
+          text: messageText,
+          isUser: true,
+        };
+        
+        // Check if this is the first message in the chat
+        const isFirstMessage = currentChat.messages.length === 0;
+        
+        setChatSessions(prevSessions => {
+          return prevSessions.map(session => {
+            if (session.id === currentChatId) {
+              return {
+                ...session,
+                messages: [...session.messages, userMessage]
+              };
+            }
+            return session;
+          });
+        });
+        
+        // Add AI response after a short delay to simulate thinking
+        setTimeout(() => {
+          const aiMessage = {
+            id: (Date.now() + 1).toString(),
+            text: isFirstMessage 
+              ? "Hello! I'm your friendly chatbot assistant. How can I help you today?" 
+              : getRandomResponse(),
+            isUser: false,
+          };
+          
+          setChatSessions(prevSessions => {
+            const newSessions = prevSessions.map(session => {
+              if (session.id === currentChatId) {
+                return {
+                  ...session,
+                  messages: [...session.messages, aiMessage]
+                };
+              }
+              return session;
+            });
+            
+            // Scroll to the latest message in the next render cycle
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+            return newSessions;
+          });
+        }, 1000);
+      }
+    };
+    
+    return (
+      <View style={styles.emptyChatContainer}>
+        {/* Menu button positioned at the top left */}
+        <TouchableOpacity 
+          style={styles.emptyScreenMenuButton} 
+          onPress={toggleDrawer}
+          accessibilityLabel="Open menu"
+          accessibilityRole="button"
+        >
+          <Ionicons name="menu" size={24} color="#3b82f6" />
+        </TouchableOpacity>
+        
+        <View style={styles.welcomeContainer}>
+          <View style={styles.logoContainer}>
+            <Ionicons name="chatbubble-ellipses" size={60} color="#3b82f6" />
+          </View>
+          <Text style={styles.welcomeText}>
+            How may I help you?
+          </Text>
+          
+          {/* Input box inside the welcome container */}
+          <View style={styles.welcomeInputContainer}>
+            <TextInput
+              style={styles.welcomeInput}
+              value={localInputText}
+              onChangeText={setLocalInputText}
+              placeholder="Message Bubl"
+              onSubmitEditing={handleSubmit}
+              autoCapitalize="sentences"
+              returnKeyType="send"
+              enablesReturnKeyAutomatically={true}
+              multiline={false}
+              accessibilityLabel="Message input field"
+              accessibilityHint="Type your message here and press send"
+            />
+            <TouchableOpacity 
+              style={styles.welcomeSendButton} 
+              onPress={localInputText.trim() ? handleSubmit : openVoiceChat}
+              activeOpacity={0.7}
+              accessibilityLabel={localInputText.trim() ? "Send message" : "Voice chat"}
+              accessibilityRole="button"
+            >
+              {localInputText.trim() ? (
+                <Ionicons name="arrow-up" size={24} color="#fff" />
+              ) : (
+                <Ionicons name="mic" size={22} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   // Drawer Component
   const DrawerMenu = () => {
     return (
       <>
-        {showDrawer && (
+        {/* Only show overlay on non-web platforms */}
+        {showDrawer && Platform.OS !== 'web' && (
           <TouchableOpacity 
             style={styles.overlay} 
             activeOpacity={1} 
@@ -293,7 +537,24 @@ export default function App() {
         <Animated.View 
           style={[
             styles.drawer,
-            { transform: [{ translateX }], width: drawerWidth }
+            Platform.OS === 'web' 
+              ? {
+                  width: drawerWidth,
+                  left: drawerAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-drawerWidth, 0],
+                  }),
+                  zIndex: 10,
+                }
+              : {
+                  width: drawerWidth,
+                  transform: [{ 
+                    translateX: drawerAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-drawerWidth, 0],
+                    }) 
+                  }],
+                }
           ]}
           {...drawerPanResponder.panHandlers}
         >
@@ -304,13 +565,108 @@ export default function App() {
                 <Ionicons name="search" size={22} color="#3b82f6" style={styles.searchIcon} />
                 <Text style={styles.searchPlaceholder}>Search</Text>
               </View>
-              <TouchableOpacity style={styles.createButton}>
-                <Ionicons name="create-outline" size={28} color="#3b82f6" />
+              <TouchableOpacity 
+                style={styles.createButton}
+                onPress={createNewChat}
+                accessibilityLabel="Create new chat"
+                accessibilityRole="button"
+              >
+                <Ionicons name="add" size={28} color="#3b82f6" />
               </TouchableOpacity>
             </View>
             
-            {/* Empty space where content was removed */}
-            <View style={styles.emptySpace} />
+            {/* Chat list */}
+            <ScrollView style={styles.chatList}>
+              {chatSessions.map(chat => (
+                <View key={chat.id} style={styles.chatItemWrapper}>
+                  <View style={[
+                    styles.chatItem,
+                    currentChatId === chat.id && styles.activeChatItem
+                  ]}>
+                    <TouchableOpacity 
+                      style={styles.chatIconContainer}
+                  onPress={() => switchChat(chat.id)}
+                >
+                  <View style={styles.chatIcon}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={22} color="#3b82f6" />
+                  </View>
+                    </TouchableOpacity>
+                  <View style={styles.chatItemContent}>
+                      {editingChatId === chat.id ? (
+                        <TextInput
+                          style={[
+                            styles.chatTitle,
+                            currentChatId === chat.id && styles.activeChatTitle,
+                            { 
+                              minWidth: 100,
+                              padding: 0,
+                              margin: 0,
+                              borderWidth: 0,
+                              backgroundColor: 'transparent'
+                            }
+                          ]}
+                          value={editingTitle || chat.title}
+                          onChangeText={(text) => {
+                            setEditingTitle(text);
+                          }}
+                          onBlur={() => {
+                            if (editingTitle && editingTitle.trim() !== chat.title) {
+                              setChatSessions(prevSessions => 
+                                prevSessions.map(session => 
+                                  session.id === chat.id 
+                                    ? { ...session, title: editingTitle.trim() }
+                                    : session
+                                )
+                              );
+                            }
+                            setEditingChatId(null);
+                            setEditingTitle('');
+                          }}
+                          autoFocus
+                          selectTextOnFocus={false}
+                          maxLength={30}
+                          multiline={false}
+                          returnKeyType="done"
+                          blurOnSubmit={true}
+                        />
+                      ) : (
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setEditingChatId(chat.id);
+                          }}
+                        >
+                          <Text style={[
+                            styles.chatTitle,
+                            currentChatId === chat.id && styles.activeChatTitle
+                          ]}>
+                            {chat.title}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity onPress={() => switchChat(chat.id)}>
+                    <Text style={styles.chatPreview} numberOfLines={1}>
+                      {chat.messages.length > 0 
+                        ? chat.messages[chat.messages.length - 1].text
+                        : 'New conversation'}
+                    </Text>
+                      </TouchableOpacity>
+                  </View>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.chatMenuButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      // Call deleteChat directly - logic is now handled inside the function
+                      deleteChat(chat.id);
+                    }}
+                    accessibilityLabel="Delete chat"
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#ff4757" />
+                </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
             
             {/* User Profile */}
             <View style={styles.userProfile}>
@@ -328,26 +684,360 @@ export default function App() {
     );
   };
 
+  useEffect(() => {
+    // When messages change from 0 to more, animate the header in
+    if (messages.length === 1) {
+      Animated.timing(headerAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [messages.length]);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[
+      styles.safeArea,
+      messages.length === 0 && styles.safeAreaNoHeader
+    ]}>
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.container}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.menuButton} 
-            onPress={toggleDrawer}
-            accessibilityLabel="Open menu"
-            accessibilityRole="button"
-          >
-            <Ionicons name="menu" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.header}>BublChat</Text>
-          <View style={styles.menuSpacer} />
-        </View>
+        {Platform.OS === 'web' ? (
+          // Simplified web layout
+          <View style={styles.webContainer}>
+            {/* Main content - simplified for web */}
+            <View 
+              style={[
+                styles.webContent,
+                {
+                  marginLeft: showDrawer ? drawerWidth : 0,
+                  width: showDrawer ? `calc(100% - ${drawerWidth}px)` : '100%',
+                }
+              ]}
+            >
+              {/* Header */}
+              {messages.length > 0 && (
+                <View style={styles.headerContainer}>
+                  <TouchableOpacity 
+                    style={styles.menuButton} 
+                    onPress={toggleDrawer}
+                    accessibilityLabel="Open menu"
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="menu" size={24} color="#fff" />
+                  </TouchableOpacity>
+                  {isEditingTitle ? (
+                    <TextInput
+                      ref={titleInputRef}
+                      style={styles.headerTitleInput}
+                      value={editingTitle}
+                      onChangeText={setEditingTitle}
+                      onBlur={saveTitleEdit}
+                      onSubmitEditing={saveTitleEdit}
+                      autoFocus
+                      selectTextOnFocus
+                      maxLength={30}
+                      placeholder="Enter chat title"
+                      placeholderTextColor="rgba(255, 255, 255, 0.7)"
+                    />
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.headerTitleContainer}
+                      onPress={handleTitleEdit}
+                      accessibilityLabel="Edit chat title"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.header}>{currentTitle}</Text>
+                      <Ionicons name="pencil" size={16} color="#fff" style={styles.editIcon} />
+                    </TouchableOpacity>
+                  )}
+                  <View style={styles.menuSpacer} />
+                </View>
+              )}
+              
+              {/* Chat container */}
+              <View 
+                style={styles.chatContainer}
+                {...panResponder.panHandlers}
+              >
+                {keyboardVisible && (
+                  <>
+                    <TouchableOpacity 
+                      style={styles.keyboardDismissOverlay}
+                      activeOpacity={1}
+                      onPress={() => Keyboard.dismiss()}
+                    />
+                    <Animated.View 
+                      style={[
+                        styles.keyboardDismissButtonContainer,
+                        {
+                          opacity: dismissButtonAnimation,
+                          transform: [
+                            { translateY: dismissButtonAnimation.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [20, 0]
+                              })
+                            }
+                          ]
+                        }
+                      ]}
+                    >
+                      <TouchableOpacity 
+                        style={styles.keyboardDismissButton}
+                        activeOpacity={0.7}
+                        onPress={() => Keyboard.dismiss()}
+                        accessibilityLabel="Dismiss keyboard"
+                        accessibilityRole="button"
+                      >
+                        <Ionicons name="chevron-down" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </Animated.View>
+                  </>
+                )}
+                
+                {messages.length === 0 ? (
+                  <EmptyChatScreen chatTitle={currentTitle} />
+                ) : (
+                  <FlatList
+                    ref={flatListRef}
+                    style={styles.chatList}
+                    data={messages}
+                    renderItem={({ item }) => (
+                      <View style={[
+                        styles.messageBubble, 
+                        item.isUser ? styles.userMessage : styles.aiMessage,
+                        { maxWidth: width * 0.75 }
+                      ]}>
+                        <Text style={[
+                          styles.messageText,
+                          item.isUser ? styles.userMessageText : styles.aiMessageText
+                        ]}>{item.text}</Text>
+                      </View>
+                    )}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.chatContent}
+                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  />
+                )}
+              </View>
+              
+              {/* Input bar */}
+              {messages.length > 0 && (
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    ref={inputRef}
+                    style={styles.input}
+                    value={inputText}
+                    onChangeText={setInputText}
+                    placeholder="Message Bubl"
+                    onSubmitEditing={sendMessage}
+                    autoCapitalize="sentences"
+                    returnKeyType="send"
+                    enablesReturnKeyAutomatically={true}
+                    multiline={false}
+                    accessibilityLabel="Message input field"
+                    accessibilityHint="Type your message here and press send"
+                  />
+                  <TouchableOpacity 
+                    style={styles.sendButton} 
+                    onPress={inputText.trim() ? sendMessage : openVoiceChat}
+                    activeOpacity={0.7}
+                    accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
+                    accessibilityRole="button"
+                  >
+                    {inputText.trim() ? (
+                      <Ionicons name="arrow-up" size={24} color="#fff" />
+                    ) : (
+                      <Ionicons name="mic" size={22} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              {/* Voice Chat Modal */}
+              <VoiceChatModal />
+            </View>
+            
+            {/* Drawer - simplified for web */}
+            {showDrawer && (
+              <View style={[styles.webDrawer, { width: drawerWidth }]}>
+                <SafeAreaView style={styles.drawerContent}>
+                  {/* Search Bar */}
+                  <View style={styles.searchContainer}>
+                    <View style={styles.searchBar}>
+                      <Ionicons name="search" size={22} color="#3b82f6" style={styles.searchIcon} />
+                      <Text style={styles.searchPlaceholder}>Search</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.createButton}
+                      onPress={createNewChat}
+                      accessibilityLabel="Create new chat"
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="add" size={28} color="#3b82f6" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {/* Chat list */}
+                  <ScrollView style={styles.chatList}>
+                    {chatSessions.map(chat => (
+                      <View key={chat.id} style={styles.chatItemWrapper}>
+                        <View style={[
+                          styles.chatItem,
+                          currentChatId === chat.id && styles.activeChatItem
+                        ]}>
+                          <TouchableOpacity 
+                            style={styles.chatIconContainer}
+                            onPress={() => switchChat(chat.id)}
+                          >
+                            <View style={styles.chatIcon}>
+                              <Ionicons name="chatbubble-ellipses-outline" size={22} color="#3b82f6" />
+                            </View>
+                          </TouchableOpacity>
+                          <View style={styles.chatItemContent}>
+                            {editingChatId === chat.id ? (
+                              <TextInput
+                                style={[
+                                  styles.chatTitle,
+                                  currentChatId === chat.id && styles.activeChatTitle,
+                                  { 
+                                    minWidth: 100,
+                                    padding: 0,
+                                    margin: 0,
+                                    borderWidth: 0,
+                                    backgroundColor: 'transparent'
+                                  }
+                                ]}
+                                value={editingTitle || chat.title}
+                                onChangeText={(text) => {
+                                  setEditingTitle(text);
+                                }}
+                                onBlur={() => {
+                                  if (editingTitle && editingTitle.trim() !== chat.title) {
+                                    setChatSessions(prevSessions => 
+                                      prevSessions.map(session => 
+                                        session.id === chat.id 
+                                          ? { ...session, title: editingTitle.trim() }
+                                          : session
+                                      )
+                                    );
+                                  }
+                                  setEditingChatId(null);
+                                  setEditingTitle('');
+                                }}
+                                autoFocus
+                                selectTextOnFocus={false}
+                                maxLength={30}
+                                multiline={false}
+                                returnKeyType="done"
+                                blurOnSubmit={true}
+                              />
+                            ) : (
+                              <TouchableOpacity 
+                                onPress={() => {
+                                  setEditingChatId(chat.id);
+                                }}
+                              >
+                                <Text style={[
+                                  styles.chatTitle,
+                                  currentChatId === chat.id && styles.activeChatTitle
+                                ]}>
+                                  {chat.title}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={() => switchChat(chat.id)}>
+                              <Text style={styles.chatPreview} numberOfLines={1}>
+                                {chat.messages.length > 0 
+                                  ? chat.messages[chat.messages.length - 1].text
+                                  : 'New conversation'}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <TouchableOpacity 
+                          style={styles.chatMenuButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            // Call deleteChat directly - logic is now handled inside the function
+                            deleteChat(chat.id);
+                          }}
+                          accessibilityLabel="Delete chat"
+                          accessibilityRole="button"
+                        >
+                          <Ionicons name="trash-outline" size={20} color="#ff4757" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                  
+                  {/* User Profile */}
+                  <View style={styles.userProfile}>
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userInitial}>B</Text>
+                    </View>
+                    <Text style={styles.userName}>Benjamin Michals</Text>
+                    <TouchableOpacity>
+                      <Ionicons name="ellipsis-horizontal" size={24} color="#999" />
+                    </TouchableOpacity>
+                  </View>
+                </SafeAreaView>
+              </View>
+            )}
+          </View>
+        ) : (
+          // iOS/Android layout - drawer overlays content (original)
+          <>
+            {messages.length > 0 && (
+              <Animated.View 
+                style={[
+                  styles.headerContainer, 
+                  { opacity: headerAnimation }
+                ]}
+              >
+                <TouchableOpacity 
+                  style={styles.menuButton} 
+                  onPress={toggleDrawer}
+                  accessibilityLabel="Open menu"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="menu" size={24} color="#fff" />
+                </TouchableOpacity>
+                {isEditingTitle ? (
+                  <TextInput
+                    ref={titleInputRef}
+                    style={styles.headerTitleInput}
+                    value={editingTitle}
+                    onChangeText={setEditingTitle}
+                    onBlur={saveTitleEdit}
+                    onSubmitEditing={saveTitleEdit}
+                    autoFocus
+                    selectTextOnFocus
+                    maxLength={30}
+                    placeholder="Enter chat title"
+                    placeholderTextColor="rgba(255, 255, 255, 0.7)"
+                  />
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.headerTitleContainer}
+                    onPress={handleTitleEdit}
+                    accessibilityLabel="Edit chat title"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.header}>{currentTitle}</Text>
+                    <Ionicons name="pencil" size={16} color="#fff" style={styles.editIcon} />
+                  </TouchableOpacity>
+                )}
+                <View style={styles.menuSpacer} />
+              </Animated.View>
+            )}
         
         <View 
           style={styles.chatContainer}
@@ -389,6 +1079,9 @@ export default function App() {
             </>
           )}
           
+              {messages.length === 0 ? (
+                <EmptyChatScreen chatTitle={currentTitle} />
+              ) : (
           <FlatList
             ref={flatListRef}
             style={styles.chatList}
@@ -412,8 +1105,11 @@ export default function App() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           />
+              )}
         </View>
         
+            {/* Only show the bottom input bar when there are messages */}
+            {messages.length > 0 && (
         <View style={styles.inputContainer}>
           <TextInput
             ref={inputRef}
@@ -443,12 +1139,159 @@ export default function App() {
             )}
           </TouchableOpacity>
         </View>
+            )}
         
         {/* Voice Chat Modal */}
         <VoiceChatModal />
         
         {/* Side Drawer */}
-        <DrawerMenu />
+            <Animated.View 
+              style={[
+                styles.drawer,
+                {
+                  transform: [{ 
+                    translateX: drawerAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-drawerWidth, 0],
+                    }) 
+                  }],
+                  width: drawerWidth
+                }
+              ]}
+            >
+              <SafeAreaView style={styles.drawerContent}>
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                  <View style={styles.searchBar}>
+                    <Ionicons name="search" size={22} color="#3b82f6" style={styles.searchIcon} />
+                    <Text style={styles.searchPlaceholder}>Search</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.createButton}
+                    onPress={createNewChat}
+                    accessibilityLabel="Create new chat"
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="add" size={28} color="#3b82f6" />
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Chat list */}
+                <ScrollView style={styles.chatList}>
+                  {chatSessions.map(chat => (
+                    <View key={chat.id} style={styles.chatItemWrapper}>
+                      <View style={[
+                        styles.chatItem,
+                        currentChatId === chat.id && styles.activeChatItem
+                      ]}>
+                        <TouchableOpacity 
+                          style={styles.chatIconContainer}
+                          onPress={() => switchChat(chat.id)}
+                        >
+                          <View style={styles.chatIcon}>
+                            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#3b82f6" />
+                          </View>
+                        </TouchableOpacity>
+                        <View style={styles.chatItemContent}>
+                          {editingChatId === chat.id ? (
+                            <TextInput
+                              style={[
+                                styles.chatTitle,
+                                currentChatId === chat.id && styles.activeChatTitle,
+                                { 
+                                  minWidth: 100,
+                                  padding: 0,
+                                  margin: 0,
+                                  borderWidth: 0,
+                                  backgroundColor: 'transparent'
+                                }
+                              ]}
+                              value={editingTitle || chat.title}
+                              onChangeText={(text) => {
+                                setEditingTitle(text);
+                              }}
+                              onBlur={() => {
+                                if (editingTitle && editingTitle.trim() !== chat.title) {
+                                  setChatSessions(prevSessions => 
+                                    prevSessions.map(session => 
+                                      session.id === chat.id 
+                                        ? { ...session, title: editingTitle.trim() }
+                                        : session
+                                    )
+                                  );
+                                }
+                                setEditingChatId(null);
+                                setEditingTitle('');
+                              }}
+                              autoFocus
+                              selectTextOnFocus={false}
+                              maxLength={30}
+                              multiline={false}
+                              returnKeyType="done"
+                              blurOnSubmit={true}
+                            />
+                          ) : (
+                            <TouchableOpacity 
+                              onPress={() => {
+                                setEditingChatId(chat.id);
+                              }}
+                            >
+                              <Text style={[
+                                styles.chatTitle,
+                                currentChatId === chat.id && styles.activeChatTitle
+                              ]}>
+                                {chat.title}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity onPress={() => switchChat(chat.id)}>
+                            <Text style={styles.chatPreview} numberOfLines={1}>
+                              {chat.messages.length > 0 
+                                ? chat.messages[chat.messages.length - 1].text
+                                : 'New conversation'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      <TouchableOpacity 
+                        style={styles.chatMenuButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          // Call deleteChat directly - logic is now handled inside the function
+                          deleteChat(chat.id);
+                        }}
+                        accessibilityLabel="Delete chat"
+                        accessibilityRole="button"
+                      >
+                        <Ionicons name="trash-outline" size={20} color="#ff4757" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+                
+                {/* User Profile */}
+                <View style={styles.userProfile}>
+                  <View style={styles.userAvatar}>
+                    <Text style={styles.userInitial}>B</Text>
+                  </View>
+                  <Text style={styles.userName}>Benjamin Michals</Text>
+                  <TouchableOpacity>
+                    <Ionicons name="ellipsis-horizontal" size={24} color="#999" />
+                  </TouchableOpacity>
+                </View>
+              </SafeAreaView>
+            </Animated.View>
+            
+            {/* Overlay when drawer is open */}
+            {showDrawer && (
+              <TouchableOpacity
+                style={styles.overlay}
+                activeOpacity={1}
+                onPress={toggleDrawer}
+              />
+            )}
+          </>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -703,5 +1546,187 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3,
+  },
+  chatItemWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  chatItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  activeChatItem: {
+    backgroundColor: '#f0f9ff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#3b82f6',
+  },
+  chatIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f9ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  chatItemContent: {
+    flex: 1,
+  },
+  chatTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 4,
+    padding: 0,
+    backgroundColor: 'transparent',
+  },
+  activeChatTitle: {
+    color: '#3b82f6',
+  },
+  chatPreview: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleInput: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    minWidth: 120,
+    textAlign: 'center',
+    padding: 0,
+    borderBottomWidth: 2,
+    borderBottomColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  editIcon: {
+    marginLeft: 8,
+  },
+  chatMenuButton: {
+    padding: 8,
+    marginRight: 4,
+  },
+  chatIconContainer: {
+    marginRight: 12,
+  },
+  // New styles for empty chat screen
+  emptyChatContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  welcomeContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 30,
+    paddingBottom: 40,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  logoContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f0f9ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  welcomeText: {
+    fontSize: 22,
+    fontWeight: '500',
+    color: '#333',
+    textAlign: 'center',
+    lineHeight: 28,
+    marginBottom: 24,
+  },
+  // Styles for the welcome input
+  welcomeInputContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    marginTop: 30,
+    paddingHorizontal: 5,
+  },
+  welcomeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+    paddingVertical: 14,
+    marginRight: 10,
+    borderRadius: 20,
+    backgroundColor: '#f9f9f9',
+    fontSize: 16,
+    minHeight: 48,
+  },
+  welcomeSendButton: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 30,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // New styles for empty screen
+  safeAreaNoHeader: {
+    backgroundColor: '#f5f5f5', // Match container background instead of blue
+  },
+  emptyScreenMenuButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 20 : 50,
+    left: 15,
+    zIndex: 10,
+    padding: 10,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    ...(Platform.OS === 'web' 
+      ? { boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.2)' }
+      : {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.2,
+          shadowRadius: 2,
+          elevation: 3,
+        }
+    ),
+  },
+  
+  // Web-specific responsive layout styles
+  webContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  webContent: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    transition: 'margin 0.25s, width 0.25s', // CSS transition for smooth animation on web
+  },
+  webDrawer: {
+    backgroundColor: '#fff',
+    height: '100%',
+    borderRightWidth: 1,
+    borderRightColor: '#eee',
+    boxShadow: '0px 0px 10px rgba(0, 0, 0, 0.1)',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    zIndex: 10,
   },
 });
