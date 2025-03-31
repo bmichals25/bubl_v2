@@ -616,15 +616,15 @@ export default function App() {
           
           {/* Bottom buttons */}
           <View style={styles.voiceButtonsContainer}>
-            <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7} className="voice-button touchable-opacity">
               <Image source={require('./assets/video_icon.png')} style={styles.voiceIcon} />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7} className="voice-button touchable-opacity">
               <Image source={require('./assets/call_icon.png')} style={styles.voiceIcon} />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.voiceButton} activeOpacity={0.7} className="voice-button touchable-opacity">
               <Ionicons name="ellipsis-horizontal" size={24} color="#fff" />
             </TouchableOpacity>
             
@@ -632,6 +632,7 @@ export default function App() {
               style={styles.voiceButton} 
               activeOpacity={0.7}
               onPress={closeVoiceChat}
+              className="voice-button touchable-opacity"
             >
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
@@ -777,6 +778,7 @@ export default function App() {
               activeOpacity={0.7}
               accessibilityLabel={localInputText.trim() ? "Send message" : "Voice chat"}
               accessibilityRole="button"
+              className="welcome-send-button touchable-opacity"
             >
               {localInputText.trim() ? (
                 <Image source={require('./assets/send_icon.png')} style={styles.welcomeIcon} />
@@ -844,6 +846,7 @@ export default function App() {
                 onPress={createNewChat}
                 accessibilityLabel="Create new chat"
                 accessibilityRole="button"
+                className="create-button touchable-opacity"
               >
                 <Ionicons name="add" size={28} color={BUBL_COLORS.mediumBlue} />
               </TouchableOpacity>
@@ -852,7 +855,7 @@ export default function App() {
             {/* Chat list */}
             <ScrollView style={styles.chatList}>
               {chatSessions.map(chat => (
-                <View key={chat.id} style={styles.chatItemWrapper}>
+                <View key={chat.id} style={styles.chatItemWrapper} className="chat-item">
                   <View style={[
                     styles.chatItem,
                     currentChatId === chat.id && styles.activeChatItem
@@ -934,6 +937,7 @@ export default function App() {
                     }}
                     accessibilityLabel="Delete chat"
                     accessibilityRole="button"
+                    className="chat-menu-button touchable-opacity"
                   >
                     <Ionicons name="trash-outline" size={20} color="#ff4757" />
                   </TouchableOpacity>
@@ -1049,6 +1053,7 @@ export default function App() {
                     onPress={toggleDrawer}
                     accessibilityLabel="Open menu"
                     accessibilityRole="button"
+                    className="menu-button touchable-opacity"
                   >
                     <Ionicons name="menu" size={24} color="#fff" />
                   </TouchableOpacity>
@@ -1072,6 +1077,7 @@ export default function App() {
                       onPress={handleTitleEdit}
                       accessibilityLabel="Edit chat title"
                       accessibilityRole="button"
+                      className="edit-title-button touchable-opacity"
                     >
                       <Text style={styles.header}>{currentTitle}</Text>
                       <Ionicons name="pencil" size={16} color="#fff" style={styles.editIcon} />
@@ -1114,6 +1120,7 @@ export default function App() {
                         onPress={() => Keyboard.dismiss()}
                         accessibilityLabel="Dismiss keyboard"
                         accessibilityRole="button"
+                        className="keyboard-dismiss-button touchable-opacity"
                       >
                         <Ionicons name="chevron-down" size={20} color="#fff" />
                       </TouchableOpacity>
@@ -1177,6 +1184,7 @@ export default function App() {
                       activeOpacity={0.7}
                       accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
                       accessibilityRole="button"
+                      className="send-button touchable-opacity"
                     >
                       {inputText.trim() ? (
                         <Image source={require('./assets/send_icon.png')} style={styles.icon} />
@@ -1242,6 +1250,7 @@ export default function App() {
                       onPress={createNewChat}
                       accessibilityLabel="Create new chat"
                       accessibilityRole="button"
+                      className="create-button touchable-opacity"
                     >
                       <Ionicons name="add" size={28} color="#3b82f6" />
                     </TouchableOpacity>
@@ -1250,7 +1259,7 @@ export default function App() {
                   {/* Chat list */}
                   <ScrollView style={styles.chatList}>
                     {chatSessions.map(chat => (
-                      <View key={chat.id} style={styles.chatItemWrapper}>
+                      <View key={chat.id} style={styles.chatItemWrapper} className="chat-item">
                         <View style={[
                           styles.chatItem,
                           currentChatId === chat.id && styles.activeChatItem
@@ -1332,6 +1341,7 @@ export default function App() {
                           }}
                           accessibilityLabel="Delete chat"
                           accessibilityRole="button"
+                          className="chat-menu-button touchable-opacity"
                         >
                           <Ionicons name="trash-outline" size={20} color="#ff4757" />
                         </TouchableOpacity>
@@ -1368,6 +1378,7 @@ export default function App() {
                   onPress={toggleDrawer}
                   accessibilityLabel="Open menu"
                   accessibilityRole="button"
+                  className="menu-button touchable-opacity"
                 >
                   <Ionicons name="menu" size={24} color="#fff" />
                 </TouchableOpacity>
@@ -1391,6 +1402,7 @@ export default function App() {
                     onPress={handleTitleEdit}
                     accessibilityLabel="Edit chat title"
                     accessibilityRole="button"
+                    className="edit-title-button touchable-opacity"
                   >
                     <Text style={styles.header}>{currentTitle}</Text>
                     <Ionicons name="pencil" size={16} color="#fff" style={styles.editIcon} />
@@ -1433,6 +1445,7 @@ export default function App() {
                   onPress={() => Keyboard.dismiss()}
                   accessibilityLabel="Dismiss keyboard"
                   accessibilityRole="button"
+                  className="keyboard-dismiss-button touchable-opacity"
                 >
                   <Ionicons name="chevron-down" size={20} color="#fff" />
                 </TouchableOpacity>
@@ -1496,6 +1509,7 @@ export default function App() {
                     activeOpacity={0.7}
                     accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
                     accessibilityRole="button"
+                    className="send-button touchable-opacity"
                   >
                     {inputText.trim() ? (
                       <Image source={require('./assets/send_icon.png')} style={styles.icon} />
@@ -1545,6 +1559,7 @@ export default function App() {
                     onPress={createNewChat}
                     accessibilityLabel="Create new chat"
                     accessibilityRole="button"
+                    className="create-button touchable-opacity"
                   >
                     <Ionicons name="add" size={28} color={BUBL_COLORS.mediumBlue} />
                   </TouchableOpacity>
@@ -1553,7 +1568,7 @@ export default function App() {
                 {/* Chat list */}
                 <ScrollView style={styles.chatList}>
                   {chatSessions.map(chat => (
-                    <View key={chat.id} style={styles.chatItemWrapper}>
+                    <View key={chat.id} style={styles.chatItemWrapper} className="chat-item">
                       <View style={[
                         styles.chatItem,
                         currentChatId === chat.id && styles.activeChatItem
@@ -1563,7 +1578,7 @@ export default function App() {
                           onPress={() => switchChat(chat.id)}
                         >
                           <View style={styles.chatIcon}>
-                            <Ionicons name="chatbubble-ellipses-outline" size={22} color={BUBL_COLORS.mediumBlue} />
+                            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#3b82f6" />
                           </View>
                         </TouchableOpacity>
                         <View style={styles.chatItemContent}>
@@ -1636,6 +1651,7 @@ export default function App() {
                         }}
                         accessibilityLabel="Delete chat"
                         accessibilityRole="button"
+                        className="chat-menu-button touchable-opacity"
                       >
                         <Ionicons name="trash-outline" size={20} color="#ff4757" />
                       </TouchableOpacity>
@@ -1668,6 +1684,7 @@ export default function App() {
                 }}
                 activeOpacity={1}
                 onPress={toggleDrawer}
+                className="overlay-touch touchable-opacity"
               />
             )}
           </>
@@ -2248,4 +2265,115 @@ const styles = StyleSheet.create({
     height: 48,
     resizeMode: 'contain',
   },
+  // Remove these invalid media query styles that are causing errors
+  // '@media (hover: hover)': {
+  //   '.chat-item:hover': {
+  //     background-color: #f5f9ff;
+  //   },
+  // },
+  // // Add hover style for voice buttons
+  // '@media (hover: hover)': {
+  //   '.voice-button:hover': {
+  //     transform: 'scale(1.05);',
+  //     background-color: '#444;',
+  //   },
+  // },
+  // // Add subtle hover effect for overlay touches
+  // '@media (hover: hover)': {
+  //   '.overlay-touch:hover': {
+  //     background-color: 'rgba(0, 0, 0, 0.02);',
+  //   },
+  // },
+  // Web-specific hover styles applied using style attribute
+  ...(Platform.OS === 'web' ? {
+    // For any web-specific styles that can't be handled in the StyleSheet
+  } : {}),
 });
+
+// Add web-specific hover styles if on web platform
+if (Platform.OS === 'web') {
+  // Add a style tag to the document head for hover effects
+  const styleTag = document.createElement('style');
+  styleTag.type = 'text/css';
+  styleTag.innerHTML = `
+    /* Button hover effects */
+    .send-button:hover {
+      transform: scale(1.05);
+      background-color: ${BUBL_COLORS.darkBlue};
+      cursor: pointer;
+    }
+    .menu-button:hover {
+      transform: scale(1.1);
+      cursor: pointer;
+    }
+    .welcome-send-button:hover {
+      transform: scale(1.05);
+      background-color: ${BUBL_COLORS.darkBlue};
+      cursor: pointer;
+    }
+    .create-button:hover {
+      transform: scale(1.1);
+      background-color: #e6f2ff;
+      cursor: pointer;
+    }
+    .chat-item:hover {
+      background-color: #f5f9ff;
+      cursor: pointer;
+    }
+    .chat-menu-button:hover {
+      transform: scale(1.1);
+      background-color: rgba(255, 71, 87, 0.1);
+      cursor: pointer;
+    }
+    .voice-button:hover {
+      transform: scale(1.05);
+      background-color: #444;
+      cursor: pointer;
+    }
+    .keyboard-dismiss-button:hover {
+      transform: scale(1.1);
+      cursor: pointer;
+    }
+    .overlay-touch:hover {
+      background-color: rgba(0, 0, 0, 0.02);
+      cursor: pointer;
+    }
+    .edit-title-button:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    
+    /* Add smooth transitions to all buttons */
+    button, 
+    [role="button"],
+    .touchable-opacity {
+      transition: transform 0.15s ease, background-color 0.15s ease, opacity 0.15s ease !important;
+    }
+    
+    /* Style input fields on focus */
+    input:focus, 
+    textarea:focus {
+      border-color: ${BUBL_COLORS.mediumBlue} !important;
+      box-shadow: 0 0 0 2px rgba(70, 159, 217, 0.2) !important;
+    }
+    
+    /* Active button state for feedback on click */
+    .touchable-opacity:active {
+      transform: scale(0.95) !important;
+      opacity: 0.9 !important;
+    }
+    
+    /* Hover effect for all buttons to ensure consistency */
+    [role="button"]:hover {
+      cursor: pointer;
+    }
+    
+    /* Nicer focus outlines for accessibility */
+    [role="button"]:focus-visible {
+      outline: 2px solid ${BUBL_COLORS.mediumBlue};
+      outline-offset: 2px;
+    }
+  `;
+  document.head.appendChild(styleTag);
+}
