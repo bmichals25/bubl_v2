@@ -2307,65 +2307,89 @@ if (Platform.OS === 'web') {
       
       // Define the CSS with stronger specificity using !important
       const css = `
+        /* Enhanced Menu Button Animation */
+        .menu-button {
+          transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+        }
+        
+        .menu-button:hover {
+          transform: scale(1.15) rotate(5deg) !important;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+          background-color: #EBF5FF !important;
+          cursor: pointer !important;
+        }
+        
+        .menu-button:active {
+          transform: scale(0.9) !important;
+          transition: all 0.1s ease-in-out !important;
+        }
+        
         /* Button hover effects with high specificity */
         .send-button:hover {
           transform: scale(1.05) !important;
           background-color: #25669d !important;
           cursor: pointer !important;
         }
-        .menu-button:hover {
-          transform: scale(1.1) !important;
-          opacity: 0.9 !important;
-          cursor: pointer !important;
-        }
+        
         .welcome-send-button:hover {
           transform: scale(1.05) !important;
           background-color: #25669d !important;
           cursor: pointer !important;
         }
+        
         .create-button:hover {
           transform: scale(1.1) !important;
           background-color: #e6f2ff !important;
           cursor: pointer !important;
         }
+        
         .chat-item:hover {
           background-color: #f5f9ff !important;
           cursor: pointer !important;
         }
+        
         .chat-icon-container:hover {
           transform: scale(1.1) !important;
           cursor: pointer !important;
         }
+        
         .chat-title-button:hover, .chat-preview-button:hover {
           text-decoration: underline !important;
           cursor: pointer !important;
         }
+        
         .chat-menu-button:hover {
           transform: scale(1.1) !important;
           background-color: rgba(255, 71, 87, 0.1) !important;
           cursor: pointer !important;
         }
+        
         .voice-button:hover {
           transform: scale(1.05) !important;
           background-color: #444 !important;
           cursor: pointer !important;
         }
+        
         .keyboard-dismiss-button:hover {
           transform: scale(1.1) !important;
           cursor: pointer !important;
         }
+        
         .keyboard-dismiss-overlay:hover {
           background-color: rgba(0, 0, 0, 0.01) !important;
         }
+        
         .overlay-touch:hover {
           background-color: rgba(0, 0, 0, 0.02) !important;
           cursor: pointer !important;
         }
+        
         .edit-title-button:hover {
           background-color: rgba(255, 255, 255, 0.1) !important;
           border-radius: 8px !important;
           cursor: pointer !important;
         }
+        
         .user-menu-button:hover {
           transform: scale(1.1) !important;
           opacity: 0.8 !important;
@@ -2373,7 +2397,7 @@ if (Platform.OS === 'web') {
         }
         
         /* Add smooth transitions to all buttons */
-        .touchable-opacity, .send-button, .menu-button, .welcome-send-button, 
+        .touchable-opacity, .send-button, .welcome-send-button, 
         .create-button, .chat-menu-button, .voice-button, .keyboard-dismiss-button,
         .overlay-touch, .edit-title-button, .chat-icon-container, .chat-title-button, 
         .chat-preview-button, .user-menu-button {
@@ -2390,7 +2414,6 @@ if (Platform.OS === 'web') {
         /* Active button state for feedback on click */
         .touchable-opacity:active, 
         .send-button:active, 
-        .menu-button:active, 
         .welcome-send-button:active, 
         .create-button:active,
         .chat-menu-button:active, 
@@ -2412,11 +2435,36 @@ if (Platform.OS === 'web') {
       // Also apply direct inline styles to buttons for maximum compatibility
       setTimeout(() => {
         try {
-          const buttons = document.querySelectorAll('.touchable-opacity, .send-button, .menu-button, .welcome-send-button');
-          buttons.forEach(button => {
-            button.style.transition = 'transform 0.15s ease, background-color 0.15s ease, opacity 0.15s ease';
+          const menuButtons = document.querySelectorAll('.menu-button');
+          menuButtons.forEach(button => {
+            button.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            // Add an event listener for mouseover to add a subtle pulse animation
+            button.addEventListener('mouseover', () => {
+              button.animate([
+                { transform: 'scale(1.0)' },
+                { transform: 'scale(1.15) rotate(5deg)' },
+                { transform: 'scale(1.12) rotate(3deg)' }
+              ], {
+                duration: 500,
+                easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                fill: 'forwards'
+              });
+            });
+            
+            // Remove animation on mouseout
+            button.addEventListener('mouseout', () => {
+              button.animate([
+                { transform: 'scale(1.12) rotate(3deg)' },
+                { transform: 'scale(1.0) rotate(0deg)' }
+              ], {
+                duration: 300,
+                easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                fill: 'forwards'
+              });
+            });
           });
-          console.log(`Applied inline styles to ${buttons.length} buttons`);
+          
+          console.log(`Enhanced ${menuButtons.length} menu buttons with animations`);
         } catch (err) {
           console.error('Error applying inline styles:', err);
         }
