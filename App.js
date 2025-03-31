@@ -32,135 +32,6 @@ const BUBL_COLORS = {
   border: '#e5e5e7'
 };
 
-// Custom hook for hover state
-export const useHover = () => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  const onMouseEnter = () => setIsHovered(true);
-  const onMouseLeave = () => setIsHovered(false);
-  
-  return [isHovered, { onMouseEnter, onMouseLeave }];
-};
-
-// Enhanced TouchableOpacity with hover effects
-export const HoverButton = ({ 
-  children, 
-  style, 
-  hoverStyle, 
-  activeStyle,
-  onPress,
-  ...props 
-}) => {
-  const [isHovered, hoverHandlers] = useHover();
-  const [isActive, setIsActive] = useState(false);
-  
-  // Only apply hover effects on web
-  const finalStyle = Platform.OS === 'web' 
-    ? [
-        style,
-        isHovered && hoverStyle,
-        isActive && activeStyle
-      ] 
-    : style;
-  
-  const handlePressIn = () => setIsActive(true);
-  const handlePressOut = () => setIsActive(false);
-  
-  // Web-specific props
-  const webProps = Platform.OS === 'web' 
-    ? {
-        ...hoverHandlers,
-        onMouseDown: handlePressIn,
-        onMouseUp: handlePressOut,
-      }
-    : {};
-    
-  return (
-    <TouchableOpacity
-      style={finalStyle}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={0.7}
-      {...webProps}
-      {...props}
-    >
-      {children}
-    </TouchableOpacity>
-  );
-};
-
-// Predefined hover effects
-export const buttonHoverEffects = {
-  // Standard button hover effect (scale up and darken)
-  standard: {
-    hoverStyle: {
-      transform: [{ scale: 1.05 }],
-      opacity: 0.9,
-    },
-    activeStyle: {
-      transform: [{ scale: 0.95 }],
-      opacity: 0.8,
-    }
-  },
-  
-  // Menu button hover effect (larger scale)
-  menu: {
-    hoverStyle: {
-      transform: [{ scale: 1.1 }],
-      opacity: 0.9,
-    },
-    activeStyle: {
-      transform: [{ scale: 0.95 }],
-      opacity: 0.8,
-    }
-  },
-  
-  // Send button hover effect (change background color)
-  send: {
-    hoverStyle: {
-      transform: [{ scale: 1.05 }],
-      backgroundColor: '#25669d', // Darker blue
-    },
-    activeStyle: {
-      transform: [{ scale: 0.95 }],
-      opacity: 0.9,
-    }
-  },
-  
-  // Delete button hover effect (reddish background)
-  delete: {
-    hoverStyle: {
-      transform: [{ scale: 1.1 }],
-      backgroundColor: 'rgba(255, 71, 87, 0.1)',
-    },
-    activeStyle: {
-      transform: [{ scale: 0.95 }],
-      opacity: 0.9,
-    }
-  },
-  
-  // Text link hover effect (underline)
-  textLink: {
-    hoverStyle: {
-      textDecorationLine: 'underline',
-    },
-    activeStyle: {
-      opacity: 0.8,
-    }
-  },
-  
-  // List item hover effect (light background)
-  listItem: {
-    hoverStyle: {
-      backgroundColor: '#f5f9ff',
-    },
-    activeStyle: {
-      opacity: 0.9,
-    }
-  },
-};
-
 export default function App() {
   const [inputText, setInputText] = useState('');
   const [chatSessions, setChatSessions] = useState([
@@ -860,16 +731,15 @@ export default function App() {
     return (
       <View style={styles.emptyChatContainer}>
         {/* Menu button positioned at the top left */}
-        <HoverButton 
+        <TouchableOpacity 
           style={styles.emptyScreenMenuButton} 
-          hoverStyle={buttonHoverEffects.menu.hoverStyle}
-          activeStyle={buttonHoverEffects.menu.activeStyle}
           onPress={toggleDrawer}
           accessibilityLabel="Open menu"
           accessibilityRole="button"
+          className="menu-button touchable-opacity"
         >
           <Ionicons name="menu" size={24} color={BUBL_COLORS.mediumBlue} />
-        </HoverButton>
+        </TouchableOpacity>
         
         {/* Logo at the top of the empty chat screen */}
         <View style={styles.welcomeLogoTopContainer}>
@@ -903,20 +773,20 @@ export default function App() {
               accessibilityLabel="Message input field"
               accessibilityHint="Type your message here and press send"
             />
-            <HoverButton 
-              style={styles.welcomeSendButton}
-              hoverStyle={buttonHoverEffects.send.hoverStyle}
-              activeStyle={buttonHoverEffects.send.activeStyle}
+            <TouchableOpacity 
+              style={styles.welcomeSendButton} 
               onPress={localInputText.trim() ? handleSubmit : openVoiceChat}
+              activeOpacity={0.7}
               accessibilityLabel={localInputText.trim() ? "Send message" : "Voice chat"}
               accessibilityRole="button"
+              className="welcome-send-button touchable-opacity"
             >
               {localInputText.trim() ? (
                 <Image source={require('./assets/send_icon.png')} style={styles.welcomeIcon} />
               ) : (
                 <Image source={require('./assets/call_icon.png')} style={styles.welcomeIcon} />
               )}
-            </HoverButton>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -972,16 +842,15 @@ export default function App() {
                 <Ionicons name="search" size={22} color={BUBL_COLORS.mediumBlue} style={styles.searchIcon} />
                 <Text style={styles.searchPlaceholder}>Search</Text>
               </View>
-              <HoverButton 
+              <TouchableOpacity 
                 style={styles.createButton}
-                hoverStyle={buttonHoverEffects.standard.hoverStyle}
-                activeStyle={buttonHoverEffects.standard.activeStyle}
                 onPress={createNewChat}
                 accessibilityLabel="Create new chat"
                 accessibilityRole="button"
+                className="create-button touchable-opacity"
               >
                 <Ionicons name="add" size={28} color={BUBL_COLORS.mediumBlue} />
-              </HoverButton>
+              </TouchableOpacity>
             </View>
             
             {/* Chat list */}
@@ -1066,19 +935,18 @@ export default function App() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <HoverButton 
+                  <TouchableOpacity 
                     style={styles.chatMenuButton}
-                    hoverStyle={buttonHoverEffects.delete.hoverStyle}
-                    activeStyle={buttonHoverEffects.delete.activeStyle}
                     onPress={(e) => {
                       e.stopPropagation();
                       deleteChat(chat.id);
                     }}
                     accessibilityLabel="Delete chat"
                     accessibilityRole="button"
+                    className="chat-menu-button touchable-opacity"
                   >
                     <Ionicons name="trash-outline" size={20} color="#ff4757" />
-                  </HoverButton>
+                  </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
@@ -1186,16 +1054,15 @@ export default function App() {
               {/* Header */}
               {messages.length > 0 && (
                 <View style={styles.headerContainer}>
-                  <HoverButton 
+                  <TouchableOpacity 
                     style={styles.menuButton} 
-                    hoverStyle={buttonHoverEffects.menu.hoverStyle}
-                    activeStyle={buttonHoverEffects.menu.activeStyle}
                     onPress={toggleDrawer}
                     accessibilityLabel="Open menu"
                     accessibilityRole="button"
+                    className="menu-button touchable-opacity"
                   >
                     <Ionicons name="menu" size={24} color="#fff" />
-                  </HoverButton>
+                  </TouchableOpacity>
                   {isEditingTitle ? (
                     <TextInput
                       ref={titleInputRef}
@@ -1254,16 +1121,16 @@ export default function App() {
                         }
                       ]}
                     >
-                      <HoverButton 
+                      <TouchableOpacity 
                         style={styles.keyboardDismissButton}
-                        hoverStyle={buttonHoverEffects.standard.hoverStyle}
-                        activeStyle={buttonHoverEffects.standard.activeStyle}
+                        activeOpacity={0.7}
                         onPress={() => Keyboard.dismiss()}
                         accessibilityLabel="Dismiss keyboard"
                         accessibilityRole="button"
+                        className="keyboard-dismiss-button touchable-opacity"
                       >
                         <Ionicons name="chevron-down" size={20} color="#fff" />
-                      </HoverButton>
+                      </TouchableOpacity>
                     </Animated.View>
                   </>
                 )}
@@ -1318,20 +1185,20 @@ export default function App() {
                       accessibilityLabel="Message input field"
                       accessibilityHint="Type your message here and press send"
                     />
-                    <HoverButton 
+                    <TouchableOpacity 
                       style={styles.sendButton} 
-                      hoverStyle={buttonHoverEffects.send.hoverStyle}
-                      activeStyle={buttonHoverEffects.send.activeStyle}
                       onPress={inputText.trim() ? sendMessage : openVoiceChat}
+                      activeOpacity={0.7}
                       accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
                       accessibilityRole="button"
+                      className="send-button touchable-opacity"
                     >
                       {inputText.trim() ? (
                         <Image source={require('./assets/send_icon.png')} style={styles.icon} />
                       ) : (
                         <Image source={require('./assets/call_icon.png')} style={styles.icon} />
                       )}
-                    </HoverButton>
+                    </TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -1385,16 +1252,15 @@ export default function App() {
                       <Ionicons name="search" size={22} color="#3b82f6" style={styles.searchIcon} />
                       <Text style={styles.searchPlaceholder}>Search</Text>
                     </View>
-                    <HoverButton 
+                    <TouchableOpacity 
                       style={styles.createButton}
-                      hoverStyle={buttonHoverEffects.standard.hoverStyle}
-                      activeStyle={buttonHoverEffects.standard.activeStyle}
                       onPress={createNewChat}
                       accessibilityLabel="Create new chat"
                       accessibilityRole="button"
+                      className="create-button touchable-opacity"
                     >
                       <Ionicons name="add" size={28} color="#3b82f6" />
-                    </HoverButton>
+                    </TouchableOpacity>
                   </View>
                   
                   {/* Chat list */}
@@ -1479,19 +1345,18 @@ export default function App() {
                             </TouchableOpacity>
                           </View>
                         </View>
-                        <HoverButton 
+                        <TouchableOpacity 
                           style={styles.chatMenuButton}
-                          hoverStyle={buttonHoverEffects.delete.hoverStyle}
-                          activeStyle={buttonHoverEffects.delete.activeStyle}
                           onPress={(e) => {
                             e.stopPropagation();
                             deleteChat(chat.id);
                           }}
                           accessibilityLabel="Delete chat"
                           accessibilityRole="button"
+                          className="chat-menu-button touchable-opacity"
                         >
                           <Ionicons name="trash-outline" size={20} color="#ff4757" />
-                        </HoverButton>
+                        </TouchableOpacity>
                       </View>
                     ))}
                   </ScrollView>
@@ -1520,16 +1385,15 @@ export default function App() {
                   { opacity: headerAnimation }
                 ]}
               >
-                <HoverButton 
+                <TouchableOpacity 
                   style={styles.menuButton} 
-                  hoverStyle={buttonHoverEffects.menu.hoverStyle}
-                  activeStyle={buttonHoverEffects.menu.activeStyle}
                   onPress={toggleDrawer}
                   accessibilityLabel="Open menu"
                   accessibilityRole="button"
+                  className="menu-button touchable-opacity"
                 >
                   <Ionicons name="menu" size={24} color="#fff" />
-                </HoverButton>
+                </TouchableOpacity>
                 {isEditingTitle ? (
                   <TextInput
                     ref={titleInputRef}
@@ -1588,16 +1452,16 @@ export default function App() {
                   }
                 ]}
               >
-                <HoverButton 
+                <TouchableOpacity 
                   style={styles.keyboardDismissButton}
-                  hoverStyle={buttonHoverEffects.standard.hoverStyle}
-                  activeStyle={buttonHoverEffects.standard.activeStyle}
+                  activeOpacity={0.7}
                   onPress={() => Keyboard.dismiss()}
                   accessibilityLabel="Dismiss keyboard"
                   accessibilityRole="button"
+                  className="keyboard-dismiss-button touchable-opacity"
                 >
                   <Ionicons name="chevron-down" size={20} color="#fff" />
-                </HoverButton>
+                </TouchableOpacity>
               </Animated.View>
             </>
           )}
@@ -1652,20 +1516,20 @@ export default function App() {
                     accessibilityLabel="Message input field"
                     accessibilityHint="Type your message here and press send"
                   />
-                  <HoverButton 
+                  <TouchableOpacity 
                     style={styles.sendButton} 
-                    hoverStyle={buttonHoverEffects.send.hoverStyle}
-                    activeStyle={buttonHoverEffects.send.activeStyle}
                     onPress={inputText.trim() ? sendMessage : openVoiceChat}
+                    activeOpacity={0.7}
                     accessibilityLabel={inputText.trim() ? "Send message" : "Voice chat"}
                     accessibilityRole="button"
+                    className="send-button touchable-opacity"
                   >
                     {inputText.trim() ? (
                       <Image source={require('./assets/send_icon.png')} style={styles.icon} />
                     ) : (
                       <Image source={require('./assets/call_icon.png')} style={styles.icon} />
                     )}
-                  </HoverButton>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -1703,16 +1567,15 @@ export default function App() {
                     <Ionicons name="search" size={22} color={BUBL_COLORS.mediumBlue} style={styles.searchIcon} />
                     <Text style={styles.searchPlaceholder}>Search</Text>
                   </View>
-                  <HoverButton 
+                  <TouchableOpacity 
                     style={styles.createButton}
-                    hoverStyle={buttonHoverEffects.standard.hoverStyle}
-                    activeStyle={buttonHoverEffects.standard.activeStyle}
                     onPress={createNewChat}
                     accessibilityLabel="Create new chat"
                     accessibilityRole="button"
+                    className="create-button touchable-opacity"
                   >
                     <Ionicons name="add" size={28} color={BUBL_COLORS.mediumBlue} />
-                  </HoverButton>
+                  </TouchableOpacity>
                 </View>
                 
                 {/* Chat list */}
@@ -1797,10 +1660,8 @@ export default function App() {
                           </TouchableOpacity>
                         </View>
                       </View>
-                      <HoverButton 
+                      <TouchableOpacity 
                         style={styles.chatMenuButton}
-                        hoverStyle={buttonHoverEffects.delete.hoverStyle}
-                        activeStyle={buttonHoverEffects.delete.activeStyle}
                         onPress={(e) => {
                           e.stopPropagation();
                           // Call deleteChat directly - logic is now handled inside the function
@@ -1808,9 +1669,10 @@ export default function App() {
                         }}
                         accessibilityLabel="Delete chat"
                         accessibilityRole="button"
+                        className="chat-menu-button touchable-opacity"
                       >
                         <Ionicons name="trash-outline" size={20} color="#ff4757" />
-                      </HoverButton>
+                      </TouchableOpacity>
                     </View>
                   ))}
                 </ScrollView>
@@ -2421,10 +2283,147 @@ const styles = StyleSheet.create({
     height: 48,
     resizeMode: 'contain',
   },
-  // Web-specific hover styles
+  // Web-specific hover styles applied using style attribute
   ...(Platform.OS === 'web' ? {
     // For any web-specific styles that can't be handled in the StyleSheet
   } : {}),
 });
 
-// We're now using React's built-in hover handling with our HoverButton component
+// Add web-specific hover styles if on web platform
+if (Platform.OS === 'web') {
+  // Wait for document to be ready
+  setTimeout(() => {
+    try {
+      // Remove any existing styles first to avoid duplicates
+      const existingStyle = document.getElementById('bubl-hover-styles');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+      
+      // Create and append the new style element
+      const styleTag = document.createElement('style');
+      styleTag.type = 'text/css';
+      styleTag.id = 'bubl-hover-styles';
+      
+      // Define the CSS with stronger specificity using !important
+      const css = `
+        /* Button hover effects with high specificity */
+        .send-button:hover {
+          transform: scale(1.05) !important;
+          background-color: #25669d !important;
+          cursor: pointer !important;
+        }
+        .menu-button:hover {
+          transform: scale(1.1) !important;
+          opacity: 0.9 !important;
+          cursor: pointer !important;
+        }
+        .welcome-send-button:hover {
+          transform: scale(1.05) !important;
+          background-color: #25669d !important;
+          cursor: pointer !important;
+        }
+        .create-button:hover {
+          transform: scale(1.1) !important;
+          background-color: #e6f2ff !important;
+          cursor: pointer !important;
+        }
+        .chat-item:hover {
+          background-color: #f5f9ff !important;
+          cursor: pointer !important;
+        }
+        .chat-icon-container:hover {
+          transform: scale(1.1) !important;
+          cursor: pointer !important;
+        }
+        .chat-title-button:hover, .chat-preview-button:hover {
+          text-decoration: underline !important;
+          cursor: pointer !important;
+        }
+        .chat-menu-button:hover {
+          transform: scale(1.1) !important;
+          background-color: rgba(255, 71, 87, 0.1) !important;
+          cursor: pointer !important;
+        }
+        .voice-button:hover {
+          transform: scale(1.05) !important;
+          background-color: #444 !important;
+          cursor: pointer !important;
+        }
+        .keyboard-dismiss-button:hover {
+          transform: scale(1.1) !important;
+          cursor: pointer !important;
+        }
+        .keyboard-dismiss-overlay:hover {
+          background-color: rgba(0, 0, 0, 0.01) !important;
+        }
+        .overlay-touch:hover {
+          background-color: rgba(0, 0, 0, 0.02) !important;
+          cursor: pointer !important;
+        }
+        .edit-title-button:hover {
+          background-color: rgba(255, 255, 255, 0.1) !important;
+          border-radius: 8px !important;
+          cursor: pointer !important;
+        }
+        .user-menu-button:hover {
+          transform: scale(1.1) !important;
+          opacity: 0.8 !important;
+          cursor: pointer !important;
+        }
+        
+        /* Add smooth transitions to all buttons */
+        .touchable-opacity, .send-button, .menu-button, .welcome-send-button, 
+        .create-button, .chat-menu-button, .voice-button, .keyboard-dismiss-button,
+        .overlay-touch, .edit-title-button, .chat-icon-container, .chat-title-button, 
+        .chat-preview-button, .user-menu-button {
+          transition: transform 0.15s ease, background-color 0.15s ease, opacity 0.15s ease, text-decoration 0.15s ease !important;
+        }
+        
+        /* Style input fields on focus */
+        input:focus, 
+        textarea:focus {
+          border-color: #469fd9 !important;
+          box-shadow: 0 0 0 2px rgba(70, 159, 217, 0.2) !important;
+        }
+        
+        /* Active button state for feedback on click */
+        .touchable-opacity:active, 
+        .send-button:active, 
+        .menu-button:active, 
+        .welcome-send-button:active, 
+        .create-button:active,
+        .chat-menu-button:active, 
+        .voice-button:active, 
+        .keyboard-dismiss-button:active,
+        .chat-icon-container:active,
+        .chat-title-button:active,
+        .chat-preview-button:active,
+        .user-menu-button:active {
+          transform: scale(0.95) !important;
+          opacity: 0.9 !important;
+        }
+      `;
+      
+      styleTag.innerHTML = css;
+      document.head.appendChild(styleTag);
+      console.log('Hover styles injected successfully!');
+      
+      // Also apply direct inline styles to buttons for maximum compatibility
+      setTimeout(() => {
+        try {
+          const buttons = document.querySelectorAll('.touchable-opacity, .send-button, .menu-button, .welcome-send-button');
+          buttons.forEach(button => {
+            button.style.transition = 'transform 0.15s ease, background-color 0.15s ease, opacity 0.15s ease';
+          });
+          console.log(`Applied inline styles to ${buttons.length} buttons`);
+        } catch (err) {
+          console.error('Error applying inline styles:', err);
+        }
+      }, 500);
+      
+    } catch (err) {
+      console.error('Error injecting hover styles:', err);
+    }
+  }, 1000); // Delay to ensure the DOM is ready
+}
