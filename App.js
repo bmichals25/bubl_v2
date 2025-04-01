@@ -733,10 +733,15 @@ export default function App() {
         {/* Menu button positioned at the top left */}
         <TouchableOpacity 
           style={styles.emptyScreenMenuButton} 
-          onPress={toggleDrawer}
+          onPress={(e) => {
+            console.log('Menu button clicked!', e);
+            toggleDrawer();
+          }}
           accessibilityLabel="Open menu"
           accessibilityRole="button"
           className="menu-button touchable-opacity"
+          id="drawer-menu-button"
+          data-testid="menu-button"
         >
           <Ionicons name="menu" size={24} color={BUBL_COLORS.mediumBlue} />
         </TouchableOpacity>
@@ -2305,25 +2310,100 @@ if (Platform.OS === 'web') {
       styleTag.type = 'text/css';
       styleTag.id = 'bubl-hover-styles';
       
-      // Define the CSS with stronger specificity using !important
+      // Add console logging for hover detection
+      const detectHoverScript = document.createElement('script');
+      detectHoverScript.id = 'hover-detection';
+      detectHoverScript.innerHTML = `
+        console.log('Hover detection script loaded');
+        
+        // Add a more direct approach to ensure we catch all hover events
+        document.body.addEventListener('mouseover', function(e) {
+          if (e.target.id === 'drawer-menu-button' || e.target.closest('#drawer-menu-button')) {
+            console.log('HOVER DETECTED on menu button!', e.target);
+          }
+        });
+        
+        // Add tracking code when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+          console.log('DOM loaded, setting up hover detection');
+          
+          // Check for menu button by ID
+          setTimeout(() => {
+            const menuButton = document.getElementById('drawer-menu-button');
+            console.log('Found menu button by ID:', menuButton);
+            
+            if (menuButton) {
+              console.log('Adding direct event listeners to button', menuButton);
+              
+              // Add direct styles to button
+              menuButton.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+              
+              // Add an event listener for mouseover to add a subtle pulse animation
+              menuButton.addEventListener('mouseover', () => {
+                console.log('Direct onmouseover fired');
+                menuButton.animate([
+                  { transform: 'scale(1.0)' },
+                  { transform: 'scale(1.15) rotate(3deg)' },
+                  { transform: 'scale(1.12) rotate(2deg)' }
+                ], {
+                  duration: 500,
+                  easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  fill: 'forwards'
+                });
+                
+                // Add a subtle glow effect
+                if (!menuButton.querySelector('.menu-button-glow')) {
+                  const glow = document.createElement('div');
+                  glow.style.position = 'absolute';
+                  glow.style.top = '0';
+                  glow.style.left = '0';
+                  glow.style.right = '0';
+                  glow.style.bottom = '0';
+                  glow.style.borderRadius = '20px';
+                  glow.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%)';
+                  glow.style.pointerEvents = 'none';
+                  glow.classList.add('menu-button-glow');
+                  menuButton.appendChild(glow);
+                  
+                  // Animate the glow
+                  glow.animate([
+                    { opacity: 0, transform: 'scale(0.5)' },
+                    { opacity: 0.5, transform: 'scale(0.8)' },
+                    { opacity: 0, transform: 'scale(1.2)' }
+                  ], {
+                    duration: 1500,
+                    iterations: Infinity,
+                    easing: 'ease-in-out'
+                  });
+                }
+              });
+              
+              // Remove animation on mouseout
+              menuButton.addEventListener('mouseout', () => {
+                console.log('Direct onmouseout fired');
+                menuButton.animate([
+                  { transform: 'scale(1.12) rotate(2deg)' },
+                  { transform: 'scale(1.0) rotate(0deg)' }
+                ], {
+                  duration: 300,
+                  easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  fill: 'forwards'
+                });
+                
+                // Remove any glow elements
+                const glows = menuButton.querySelectorAll('.menu-button-glow');
+                glows.forEach(glow => {
+                  glow.remove();
+                });
+              });
+            }
+          }, 1000);
+        });
+      `;
+      document.head.appendChild(detectHoverScript);
+      
+      // Define the CSS - remove the menu-button hover styles as we're applying them directly
       const css = `
-        /* Enhanced Menu Button Animation */
-        .menu-button {
-          transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-        }
-        
-        .menu-button:hover {
-          transform: scale(1.15) rotate(5deg) !important;
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
-          background-color: #EBF5FF !important;
-          cursor: pointer !important;
-        }
-        
-        .menu-button:active {
-          transform: scale(0.9) !important;
-          transition: all 0.1s ease-in-out !important;
-        }
-        
         /* Button hover effects with high specificity */
         .send-button:hover {
           transform: scale(1.05) !important;
@@ -2432,6 +2512,188 @@ if (Platform.OS === 'web') {
       document.head.appendChild(styleTag);
       console.log('Hover styles injected successfully!');
       
+      // Added a direct hover effects script for the menu button
+      const menuButtonHoverScript = document.createElement('script');
+      menuButtonHoverScript.id = 'menu-button-hover-effects';
+      menuButtonHoverScript.innerHTML = `
+        // Create persistent observers to ensure hover effects remain even after DOM changes
+        let menuButtonObserver;
+        let closeButtonObserver;
+        
+        // Define handlers as named functions so they can be properly removed
+        function handleMenuButtonMouseEnter(e) {
+          console.log('Menu button mouseenter detected', this);
+          
+          // Use more subtle, natural animation
+          this.style.transition = 'all 0.25s cubic-bezier(0.2, 0, 0.3, 1)';
+          this.style.transform = 'scale(1.08) rotate(2deg)';
+          this.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.15)';
+          this.style.backgroundColor = '#EBF5FF';
+          
+          // Stop propagation to prevent multiple handlers firing
+          e.stopPropagation();
+        }
+        
+        function handleMenuButtonMouseLeave(e) {
+          console.log('Menu button mouseleave detected', this);
+          
+          // Reset with natural transition
+          this.style.transition = 'all 0.2s ease-out';
+          this.style.transform = 'scale(1.0) rotate(0deg)';
+          this.style.boxShadow = '';
+          this.style.backgroundColor = '';
+          
+          // Stop propagation to prevent multiple handlers firing
+          e.stopPropagation();
+        }
+
+        // Apply hover effects directly to all buttons with specific IDs
+        function applyHoverEffects() {
+          // Try to find the menu button in both open and closed states
+          const menuButton = document.getElementById('drawer-menu-button');
+          const allButtons = document.querySelectorAll('button');
+          const overlayButtons = document.querySelectorAll('.overlay-touch');
+          
+          // Track if we've found and applied effects to any button
+          let appliedEffects = false;
+          
+          if (menuButton) {
+            console.log('Applying direct hover effects to drawer-menu-button');
+            applyEffectsToButton(menuButton);
+            appliedEffects = true;
+          }
+          
+          // Also look for any button that might be the menu toggle
+          allButtons.forEach(button => {
+            // Look for common identifiers of menu buttons
+            const buttonText = button.textContent || '';
+            const hasMenuIcon = buttonText.includes('') || buttonText.includes('☰') || buttonText.includes('≡');
+            
+            if (hasMenuIcon || 
+                (button.ariaLabel && button.ariaLabel.toLowerCase().includes('menu')) ||
+                (button.id && button.id.toLowerCase().includes('menu'))) {
+              console.log('Found potential menu button', button);
+              applyEffectsToButton(button);
+              appliedEffects = true;
+            }
+          });
+          
+          // Handle the overlay/close button when drawer is open
+          overlayButtons.forEach(overlay => {
+            console.log('Found drawer overlay (close button)', overlay);
+            overlay.addEventListener('mouseenter', () => {
+              // Make cursor a pointer to indicate it's clickable
+              overlay.style.cursor = 'pointer';
+              
+              // Find any menu buttons and animate them to indicate they can be clicked to close
+              const menuButtons = document.querySelectorAll('button');
+              menuButtons.forEach(btn => {
+                const buttonText = btn.textContent || '';
+                const hasMenuIcon = buttonText.includes('') || buttonText.includes('☰') || buttonText.includes('≡');
+                
+                if (hasMenuIcon || 
+                    (btn.ariaLabel && btn.ariaLabel.toLowerCase().includes('menu')) ||
+                    (btn.id && btn.id.toLowerCase().includes('menu'))) {
+                  // Apply a subtle animation to the menu button when hovering over overlay
+                  btn.style.transition = 'all 0.25s cubic-bezier(0.2, 0, 0.3, 1)';
+                  btn.style.transform = 'scale(1.08) rotate(2deg)';
+                  btn.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.15)';
+                  btn.style.backgroundColor = '#EBF5FF';
+                }
+              });
+            });
+            
+            overlay.addEventListener('mouseleave', () => {
+              // Reset cursor
+              overlay.style.cursor = '';
+              
+              // Reset menu button animations
+              const menuButtons = document.querySelectorAll('button');
+              menuButtons.forEach(btn => {
+                const buttonText = btn.textContent || '';
+                const hasMenuIcon = buttonText.includes('') || buttonText.includes('☰') || buttonText.includes('≡');
+                
+                if (hasMenuIcon || 
+                    (btn.ariaLabel && btn.ariaLabel.toLowerCase().includes('menu')) ||
+                    (btn.id && btn.id.toLowerCase().includes('menu'))) {
+                  btn.style.transition = 'all 0.2s ease-out';
+                  btn.style.transform = 'scale(1.0) rotate(0deg)';
+                  btn.style.boxShadow = '';
+                  btn.style.backgroundColor = '';
+                }
+              });
+            });
+            
+            appliedEffects = true;
+          });
+          
+          return appliedEffects;
+        }
+        
+        function applyEffectsToButton(button) {
+          // Disconnect any existing observer to prevent loops
+          if (menuButtonObserver) {
+            menuButtonObserver.disconnect();
+          }
+          
+          // Clear any existing transition to avoid conflicts
+          button.style.transition = '';
+          setTimeout(() => {
+            // Remove any existing event listeners to prevent duplicates
+            button.removeEventListener('mouseenter', handleMenuButtonMouseEnter);
+            button.removeEventListener('mouseleave', handleMenuButtonMouseLeave);
+            
+            // Add the event listeners again
+            button.addEventListener('mouseenter', handleMenuButtonMouseEnter);
+            button.addEventListener('mouseleave', handleMenuButtonMouseLeave);
+          }, 50);
+          
+          // Create a new observer
+          menuButtonObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (mutation.type === 'attributes' && 
+                  (mutation.attributeName === 'style' || 
+                   mutation.attributeName === 'class')) {
+                // A style or class changed, reapply our hover listeners
+                setTimeout(() => {
+                  button.removeEventListener('mouseenter', handleMenuButtonMouseEnter);
+                  button.removeEventListener('mouseleave', handleMenuButtonMouseLeave);
+                  button.addEventListener('mouseenter', handleMenuButtonMouseEnter);
+                  button.addEventListener('mouseleave', handleMenuButtonMouseLeave);
+                }, 50);
+              }
+            });
+          });
+          
+          // Start observing the button for attribute changes
+          menuButtonObserver.observe(button, {
+            attributes: true,
+            attributeFilter: ['style', 'class']
+          });
+        }
+        
+        // Run immediately
+        const initialSuccess = applyHoverEffects();
+        
+        // Watch for DOM changes to catch when new elements are added
+        const bodyObserver = new MutationObserver((mutations) => {
+          setTimeout(applyHoverEffects, 100);
+        });
+        
+        bodyObserver.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+        
+        // Also run after delays to catch any dynamically added elements
+        setTimeout(applyHoverEffects, 1000);
+        setTimeout(applyHoverEffects, 2000);
+        
+        // Create a recurring check to ensure the effects are always applied
+        setInterval(applyHoverEffects, 3000);
+      `;
+      document.head.appendChild(menuButtonHoverScript);
+      
       // Also apply direct inline styles to buttons for maximum compatibility
       setTimeout(() => {
         try {
@@ -2440,26 +2702,62 @@ if (Platform.OS === 'web') {
             button.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             // Add an event listener for mouseover to add a subtle pulse animation
             button.addEventListener('mouseover', () => {
+              console.log('Menu button hovered!', button);
               button.animate([
                 { transform: 'scale(1.0)' },
-                { transform: 'scale(1.15) rotate(5deg)' },
-                { transform: 'scale(1.12) rotate(3deg)' }
+                { transform: 'scale(1.15) rotate(3deg)' },
+                { transform: 'scale(1.12) rotate(2deg)' }
               ], {
                 duration: 500,
                 easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                 fill: 'forwards'
               });
+              
+              // Add a subtle glow effect
+              const glow = document.createElement('div');
+              glow.style.position = 'absolute';
+              glow.style.top = '0';
+              glow.style.left = '0';
+              glow.style.right = '0';
+              glow.style.bottom = '0';
+              glow.style.borderRadius = '20px';
+              glow.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%)';
+              glow.style.pointerEvents = 'none';
+              glow.classList.add('menu-button-glow');
+              
+              // Only add if not already present
+              if (!button.querySelector('.menu-button-glow')) {
+                button.appendChild(glow);
+                
+                // Animate the glow
+                glow.animate([
+                  { opacity: 0, transform: 'scale(0.5)' },
+                  { opacity: 0.5, transform: 'scale(0.8)' },
+                  { opacity: 0, transform: 'scale(1.2)' }
+                ], {
+                  duration: 1500,
+                  iterations: Infinity,
+                  easing: 'ease-in-out'
+                });
+              }
             });
             
             // Remove animation on mouseout
             button.addEventListener('mouseout', () => {
+              console.log('Menu button mouse out!', button);
               button.animate([
-                { transform: 'scale(1.12) rotate(3deg)' },
+                { transform: 'scale(1.12) rotate(2deg)' },
                 { transform: 'scale(1.0) rotate(0deg)' }
               ], {
                 duration: 300,
                 easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                 fill: 'forwards'
+              });
+              
+              // Remove any glow elements
+              const glows = button.querySelectorAll('.menu-button-glow');
+              glows.forEach(glow => {
+                glow.remove();
               });
             });
           });
